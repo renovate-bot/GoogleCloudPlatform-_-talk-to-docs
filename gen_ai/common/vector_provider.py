@@ -1,6 +1,20 @@
+"""Module for managing vectorization, vector storage, and retrieval strategies.
+
+This module provides classes and functions for:
+
+* **VectorStore:** Abstract base class defining vector search interfaces.
+* **ChromaVectorStore:** Concrete implementation using Chroma for vector storage and search.
+* **VertexVectorStore:**  Concrete implementation leveraging Vertex AI for vector storage and search.
+* **VectorStrategy:** Abstract base class for vector embedding and index creation logic.
+* **VectorStrategyProvider:** Provides a factory for selecting appropriate VectorStrategy.
+* **ChromaVectorStrategy:**  Concrete implementation of VectorStrategy for Chroma.
+* **VertexAIVectorStrategy:** Concrete implementation of VectorStrategy for Vertex AI.
+"""
+
 import glob
 import os
 import random
+import shutil
 import string
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -11,9 +25,9 @@ from langchain.schema import Document
 from langchain.schema.embeddings import Embeddings
 from langchain.vectorstores import Chroma
 
-from gen_ai.common.storage import Storage
 from gen_ai.common.common import default_extract_data
 from gen_ai.common.inverted_index import InvertedIndex
+from gen_ai.common.storage import Storage
 from gen_ai.constants import PROCESSED_FILES_DIR, VECTOR_STORE
 
 
@@ -28,27 +42,76 @@ class DeployedEndpoint:
 
 
 class VectorStore(ABC):
+    """Abstract base class for vector stores.
+
+    Defines the interface for similarity search and maximum marginal relevance search.
+    """
+
     @abstractmethod
-    def similarity_search(self, query: str, k: int = 4, **kwargs):
+    def similarity_search(self, query: str, k: int = 4, **kwargs) -> list[Document]:
+        """Performs a similarity search on the vector store.
+
+        Args:
+            query (str): The query text.
+            k (int, optional): The number of results to return. Defaults to 4.
+            **kwargs: Additional arguments to be passed to the underlying implementation.
+
+        Returns:
+            List[Document]: A list of LangChain Document objects representing the results.
+        """
         pass
 
     @abstractmethod
     def max_marginal_relevance_search(
         self, query: str, k: int = 4, fetch_k: int = 20, lambda_mult: float = 0.5, **kwargs
-    ):
+    ) -> list[Document]:
+        """Performs a maximum marginal relevance (MMR) search on the vector store.
+
+        Args:
+            query (str): The query text.
+            k (int, optional): The number of results to return. Defaults to 4.
+            fetch_k (int, optional):  The number of documents to initially retrieve. Defaults to 20
+            lambda_mult (float, optional): Multiplier for controlling MMR tradeoff. Defaults to 0.5.
+            **kwargs: Additional arguments to be passed to the underlying implementation.
+
+        Returns:
+            List[Document]: A list of LangChain Document objects representing the results.
+        """
         pass
 
 
 class VectorStrategy(ABC):
+    """Abstract base class for defining vector embedding and index creation strategies.
+
+    Attributes:
+        storage_interface (Storage): An interface for interacting with storage systems.
+    """
+
     def __init__(self, storage_interface: Storage):
         self.storage_interface = storage_interface
 
     @abstractmethod
     def get_vector_indices(self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str]):
+        """Retrieves or creates vector indices based on the provided configuration.
+
+        Args:
+            regenerate (bool): If True, forces index regeneration.
+            embeddings (Embeddings): The embedding model to use for generating vector representations.
+            vector_indices (dict[str, str]): Existing vector indices (if any).
+
+        Returns:
+            dict[str, str]: A dictionary mapping plan names to their corresponding vector indices.
+        """
         raise NotImplementedError("Cannot be invoked directly from abstract class")
 
 
 class ChromaVectorStore(VectorStore):
+    """Concrete implementation of VectorStore using Chroma for vector storage and search.
+
+    Attributes:
+        chroma (Chroma): The Chroma instance for managing the vector store.
+    """
+
     def __init__(self, chroma):
         self.chroma = chroma
 
@@ -62,6 +125,15 @@ class ChromaVectorStore(VectorStore):
 
 
 class VertexVectorStore(VectorStore):
+    """Concrete implementation of VectorStore using Vertex AI for vector storage and search.
+
+    Attributes:
+        vertex (aiplatform.MatchingEngineIndexEndpoint): Vertex AI endpoint instance.
+        index_id (str): The ID of the Vertex AI index.
+        embeddings (Embeddings): The embedding model used for generating vectors.
+        doc_mapping (dict):  Mapping between document IDs and their textual content/metadata.
+    """
+
     def __init__(self, vertex, index_id, embeddings, doc_mapping) -> None:
         self.vertex = vertex
         self.index_id = index_id
@@ -93,6 +165,8 @@ class VertexVectorStore(VectorStore):
 
 
 class VectorStrategyProvider:
+    """Factory class for selecting the appropriate VectorStrategy implementation."""
+
     def __init__(self, vector_name):
         self.vector_name = vector_name
 
@@ -101,7 +175,8 @@ class VectorStrategyProvider:
         Vector strategy consists of two functionalities: vector embeddings and vector indices creation
 
         Raises:
-            ValueError: currently supports openai and vertexai strategies. Raises exception if other types are specified
+            ValueError: currently supports openai and vertexai strategies. Raises exception if other types are
+            specified
 
         Returns:
             Embeddings: langchain class of base embeddings
@@ -112,10 +187,12 @@ class VectorStrategyProvider:
         elif "chroma" in self.vector_name:
             return ChromaVectorStrategy(**kwargs)
         else:
-            raise ValueError(f"Not supported embeddings name in config")
+            raise ValueError("Not supported embeddings name in config")
 
 
 class ChromaVectorStrategy(VectorStrategy):
+    """Concrete implementation of VectorStrategy for using Chroma as the vector store."""
+
     def __init__(self, storage_interface: Storage) -> None:
         super().__init__(storage_interface)
         self.vectore_store_path = f"{VECTOR_STORE}_chroma"
@@ -125,7 +202,7 @@ class ChromaVectorStrategy(VectorStrategy):
             if os.path.exists(self.vectore_store_path):
                 try:
                     os.rmdir(self.vectore_store_path)
-                except OSError as e:
+                except OSError as _:
                     os.removedirs(self.vectore_store_path)
 
             docs = self.storage_interface.process_directory(PROCESSED_FILES_DIR, default_extract_data)
@@ -140,7 +217,9 @@ class ChromaVectorStrategy(VectorStrategy):
 
 
 class VertexAIVectorStrategy(VectorStrategy):
-    DEPLOYED_INDEX_ID = f"article_index_endpoint_deployed"
+    """Concrete implementation of VectorStrategy for using Vertex AI as the vector store."""
+
+    DEPLOYED_INDEX_ID = "article_index_endpoint_deployed"
     ARTICLE_INDEX = "article_index"
     ARTICLE_INDEX_ENDPOINT = "article_index_endpoint"
 
@@ -149,8 +228,6 @@ class VertexAIVectorStrategy(VectorStrategy):
         self.vectore_store_path = f"{VECTOR_STORE}_vertexai"
 
     def __create(self, embeddings: Embeddings):
-        import shutil
-
         if not os.path.exists(self.vectore_store_path):
             print("Creating the directory...")
             os.makedirs(self.vectore_store_path)
@@ -167,7 +244,7 @@ class VertexAIVectorStrategy(VectorStrategy):
             embs_plan = [(f"{plan}_{i}", x) for i, x in enumerate(embs)]
             embs_df = pd.DataFrame(embs_plan, columns=["id", "embedding"])
             plan_output_jsonl = store_path + "_df.json"
-            with open(plan_output_jsonl, "w") as f:
+            with open(plan_output_jsonl, "w", encoding="utf-8") as f:
                 f.write(embs_df.to_json(orient="records", lines=True, force_ascii=False))
             all_jsons[plan] = plan_output_jsonl
 
@@ -230,7 +307,7 @@ class VertexAIVectorStrategy(VectorStrategy):
             os.makedirs(endpoints_dir)
         for endpoint in deployed_endpoints:
             endpoint_index = endpoint.index.replace("/", "_")
-            with open(f"{endpoints_dir}/{endpoint_index}.txt", "w+") as f:
+            with open(f"{endpoints_dir}/{endpoint_index}.txt", "w+", encoding="utf-8") as f:
                 f.write(
                     "\n".join(
                         [
@@ -250,7 +327,7 @@ class VertexAIVectorStrategy(VectorStrategy):
         endpoint_files = glob.glob(endpoints_dir + "/*.txt")
 
         for endpoint_file in endpoint_files:
-            with open(endpoint_file, "r+") as f:
+            with open(endpoint_file, "r+", encoding="utf-8") as f:
                 endpoint_lines = f.readlines()
                 endpoint_lines = [x.strip().replace("\n", "") for x in endpoint_lines]
                 deployed_endpoint = DeployedEndpoint(
@@ -273,6 +350,8 @@ class VertexAIVectorStrategy(VectorStrategy):
 
         for deployed_endpoint in deployed_endpoints:
             real_endpoint_object = aiplatform.MatchingEngineIndexEndpoint(deployed_endpoint.index_endpoint_name)
-            vector_store = VertexVectorStore(real_endpoint_object, deployed_endpoint.deployed_index_endpoint_name, embeddings, doc_mapping)
+            vector_store = VertexVectorStore(
+                real_endpoint_object, deployed_endpoint.deployed_index_endpoint_name, embeddings, doc_mapping
+            )
             vector_indices[deployed_endpoint.plan] = vector_store
         return vector_indices

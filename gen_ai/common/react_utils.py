@@ -73,12 +73,12 @@ def get_confidence_score(question: str, answer: str) -> int:
     try:
         answer_scoring_raw = answer_scoring_raw.replace("```json", "").replace("```", "")
         answer_scoring = json5.loads(answer_scoring_raw)
-    except Exception: # pylint: disable=W0718
+    except Exception:  # pylint: disable=W0718
         try:
             answer_scoring_raw = json_corrector_chain().run(json=answer_scoring_raw)
             answer_scoring_raw = answer_scoring_raw.replace("```json", "").replace("```", "")
             answer_scoring = json5.loads(answer_scoring_raw)
-        except Exception as _: # pylint: disable=W0718
+        except Exception as _:  # pylint: disable=W0718
             print("failed to parse confidence score")
             print(f"{answer_scoring_raw}")
             answer_scoring = {"helpfullness_score": 0}
@@ -113,7 +113,7 @@ def score_document(
     - index (int): The index of the document in the original list of documents. Used to match the score and reasoning
       back to the correct document.
     - question (str): The question string against which the document's relevance is being scored.
-    - retriever_scoring_chain (LLMChain): The Language Model Chain used for scoring the document's relevance to the 
+    - retriever_scoring_chain (LLMChain): The Language Model Chain used for scoring the document's relevance to the
       question.
     - json_corrector_chain (LLMChain): The Language Model Chain used for correcting the output from the retriever
       scoring chain if it is not valid JSON.
@@ -137,19 +137,19 @@ def score_document(
       score to 0 and prints the raw output for inspection.
     """
     output = {}
-    doc_content = doc.page_content if Container.config.get('use_full_documents', False) else doc.metadata["summary"]
+    doc_content = doc.page_content if Container.config.get("use_full_documents", False) else doc.metadata["summary"]
     try:
         output_raw = retriever_scoring_chain.run(retrieved_doc=doc_content, question=question)
         try:
             output_raw = output_raw.replace("```json", "").replace("```", "")
             output = json5.loads(output_raw)
-        except Exception: # pylint: disable=W0718
+        except Exception:  # pylint: disable=W0718
             json_output = json_corrector_chain.run(json=output_raw)
             json_output = json_output.replace("```json", "").replace("```", "")
             output = json5.loads(json_output)
         relevancy_score = int(output["relevancy_score"])
         relevancy_reasoning = output["relevancy_reasoning"]
-    except Exception as e: # pylint: disable=W0718
+    except Exception as e:  # pylint: disable=W0718
         print("Error in parsing the document for relevancy score")
         print(str(e))
         relevancy_score = 0
@@ -240,14 +240,14 @@ def summarize_document(
             try:
                 output_raw = output_raw.replace("```json", "").replace("```", "")
                 output = json5.loads(output_raw)
-            except Exception: # pylint: disable=W0718
+            except Exception:  # pylint: disable=W0718
                 json_output = json_corrector_chain.run(json=output_raw)
                 json_output = json_output.replace("```json", "").replace("```", "")
                 output = json5.loads(json_output)
             summary = output["summary"]
             summary_reasoning = output["summary_reasoning"]
 
-        except Exception as e: # pylint: disable=W0718
+        except Exception as e:  # pylint: disable=W0718
             print("Error in summarizing the document")
             print(str(e))
             summary = "The text could not be summarized"
