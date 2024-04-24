@@ -33,3 +33,26 @@ If you have any questions or need assistance, feel free to reach out to the proj
 
 Happy GenAI development!
 
+
+### Setting up Docker
+If this is your first time, you probably don't have Docker installed on VM. Execute the following commands:
+```
+sudo apt update && sudo apt upgrade
+sudo apt install make
+sudo apt install docker.io
+sudo groupadd docker
+sudo usermod -aG docker $USER
+sudo chmod 777 /var/run/docker.sock
+```
+
+### Setting up environment
+
+```
+make build && make container
+```
+
+If you want to remove it, execute:
+
+```
+make clean
+```
