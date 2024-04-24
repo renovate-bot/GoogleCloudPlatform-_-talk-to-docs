@@ -34,6 +34,24 @@ If you have any questions or need assistance, feel free to reach out to the proj
 Happy GenAI development!
 
 
+## Setting up
+To begin development you can use 2 different approaches: using Python Environment or using Docker. Below are instructions for each approach.
+
+### Setting up Python Environment
+Make sure to install miniconda environment:
+```
+cd ~/
+mkdir -p ~/miniconda3
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh
+bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
+~/miniconda3/bin/conda init bash
+```
+After that just install the package in editable mode:
+
+```
+pip install -e .
+```
+
 ### Setting up Docker
 If this is your first time, you probably don't have Docker installed on VM. Execute the following commands:
 ```
