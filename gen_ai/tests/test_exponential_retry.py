@@ -33,5 +33,5 @@ def test_max_retry_exceeded():
     with patch("time.sleep"), pytest.raises(Exception) as exc_info:
         wrapper.run("test")
 
-    assert "failed after 3 retries" in str(exc_info.value)
-    assert mock_chain.run.call_count == 3
+    assert "failed after 15 retries" in str(exc_info.value)
+    assert mock_chain.run.call_count == 15

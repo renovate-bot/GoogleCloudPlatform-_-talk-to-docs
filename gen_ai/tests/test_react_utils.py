@@ -17,14 +17,14 @@ def test_get_confidence_score_high():
     question = "What is the capital of France?"
     answer = "The capital of France is Paris."
     confidence = get_confidence_score(question, answer)
-    assert confidence >= 90
+    assert confidence >= 5
 
 
 def test_get_confidence_score_low():
     question = "What is the capital of France?"
     answer = "I was not able to find an information about the capital of France"
     confidence = get_confidence_score(question, answer)
-    assert confidence <= 10
+    assert confidence <= 1
 
 
 def test_score_document_high():
@@ -39,7 +39,7 @@ def test_score_document_high():
     index, doc = score_document(doc, 1, question, retriever_scoring_chain, json_corrector_chain)
 
     assert index == 1, "Index must be the same as the document index"
-    assert doc.metadata["relevancy_score"] >= 90, "Document must be very relevant"
+    assert doc.metadata["relevancy_score"] >= 5, "Document must be very relevant"
 
 
 def test_score_document_low():
@@ -51,7 +51,7 @@ def test_score_document_low():
     index, doc = score_document(doc, 1, question, retriever_scoring_chain, json_corrector_chain)
 
     assert index == 1, "Index must be the same as the document index"
-    assert doc.metadata["relevancy_score"] <= 10, "Document must be very irrelevant"
+    assert doc.metadata["relevancy_score"] <= 1, "Document must be very irrelevant"
 
 
 @patch("gen_ai.common.react_utils.score_document")
