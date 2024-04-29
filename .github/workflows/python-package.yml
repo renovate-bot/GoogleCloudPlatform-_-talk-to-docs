@@ -4,6 +4,9 @@
 name: Python package
 
 on:
+permissions:
+  contents: read
+  id-token: write
   push:
     branches: [ "main" ]
   pull_request:
