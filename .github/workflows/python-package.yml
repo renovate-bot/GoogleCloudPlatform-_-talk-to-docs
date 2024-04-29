@@ -34,5 +34,9 @@ jobs:
         # stop the build if there are Python syntax errors or undefined names
         pylint gen_ai/llm.py
     - name: Test with pytest
+    - uses: 'google-github-actions/auth@v2'
+      with:
+        project_id: 'chertushkin-genai-sa'
+        workload_identity_provider: '${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}'
       run: |
         pytest gen_ai/tests
