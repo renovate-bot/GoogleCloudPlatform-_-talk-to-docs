@@ -41,7 +41,8 @@ import argparse
 
 from google.cloud import bigquery
 
-from gen_ai.common.bq_utils import create_bq_client, create_dataset, create_table
+from gen_ai.common.bq_utils import create_bq_client, create_dataset, create_table, get_dataset_id
+from gen_ai.common.ioc_container import Container
 
 schema_gt = [
     bigquery.SchemaField("question_id", "STRING", mode="REQUIRED"),
@@ -103,32 +104,29 @@ schema_question = [
 
 schema_experiment = [
     bigquery.SchemaField("system_state_id", "STRING", mode="REQUIRED"),
+    bigquery.SchemaField("session_id", "STRING", mode="REQUIRED"),
     bigquery.SchemaField("github_hash", "STRING", mode="REQUIRED"),
     bigquery.SchemaField("gcs_bucket_path", "STRING", mode="REQUIRED"),
+    bigquery.SchemaField("pipeline_parameters", "STRING", mode="REQUIRED"),
+    bigquery.SchemaField("comments", "STRING", mode="NULLABLE"),
 ]
 
 if __name__ == "__main__":
     # example usage: python create_tables.py 'uhg' --recreate_table
     parser = argparse.ArgumentParser(description="Create BigQuery tables.")
-    parser.add_argument(
-        "--project_id",
-        type=str,
-        help="Optional: Google Cloud project ID. If not provided, the default project will be used.",
-        default=None,
-    )
-    parser.add_argument("dataset_name", type=str, help="BigQuery dataset name")
     parser.add_argument("--recreate_dataset", action="store_true", help="Flag to recreate the dataset")
     parser.add_argument("--recreate_table", action="store_true", help="Flag to recreate the tables")
     args = parser.parse_args()
 
-    client = create_bq_client(project_id=args.project_id)
+    project_id = Container.config["bq_project_id"]
+    client = create_bq_client(project_id=project_id)
+    dataset_id = get_dataset_id()
 
-    dataset_id = f"{client.project}.{args.dataset_name}"
     create_dataset(client, dataset_id, recreate_dataset=args.recreate_dataset)
 
     schemas = [schema_prediction, schema_eval, schema_gt, schema_question, schema_experiment]
-    tables_names = ["prediction"]  # , "query_evaluation", "ground_truth", "question", "experiment"]
+    tables_names = ["prediction", "query_evaluation", "ground_truth", "questions", "experiment"]
 
     for schema, table_name in zip(schemas, tables_names):
-        table_id = f"{client.project}.{args.dataset_name}.{table_name}"
+        table_id = f"{dataset_id}.{table_name}"
         create_table(client, table_id, schema, args.recreate_table)

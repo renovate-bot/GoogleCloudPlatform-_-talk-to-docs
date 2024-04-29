@@ -86,7 +86,8 @@ def get_default_personalized_info(row: dict) -> dict | None:
 @click.command()
 @click.argument("mode", required=True)
 @click.argument("csv_path", required=False, type=click.Path(exists=True))
-def run_pipeline(mode: Literal["batch", "step"] = "step", csv_path: str = None) -> None:
+@click.argument("comments", required=False)
+def run_pipeline(mode: Literal["batch", "step"] = "step", csv_path: str = None, comments: str | None = None) -> None:
     """Executes the pipeline check based on the specified mode.
 
     This function orchestrates the loading and processing of questions to evaluate the language model's response
@@ -109,6 +110,7 @@ def run_pipeline(mode: Literal["batch", "step"] = "step", csv_path: str = None) 
     session_id = str(uuid.uuid4())
     Container.session_id = session_id
     Container.logger().info(msg=f"Session id is: {session_id}")
+    Container.comments = comments
     if mode == "batch":
 
         df = get_input_df(csv_path)

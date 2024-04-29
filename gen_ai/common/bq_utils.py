@@ -23,6 +23,9 @@ import datetime
 import getpass
 import json
 import uuid
+import git
+import os
+import re
 
 import google.auth
 import pandas as pd
@@ -33,6 +36,7 @@ from google.cloud.bigquery.schema import SchemaField
 from gen_ai.common.ioc_container import Container
 from gen_ai.common.memorystore_utils import convert_dict_to_relevancies, convert_dict_to_summaries
 from gen_ai.deploy.model import QueryState
+from gen_ai.constants import MAX_OUTPUT_TOKENS
 
 
 def create_bq_client(project_id: str | None = None) -> bigquery.Client | None:
@@ -137,6 +141,126 @@ def load_data_to_bq(client: bigquery.Client, table_id: str, schema: list[SchemaF
                     print(f"Field that caused the error: {error['location']}")
 
 
+def log_system_status(session_id: str) -> str:
+    """
+    Logs the current system status and pipeline parameters to a BigQuery table for tracking and reproducibility.
+
+    This function gathers essential information about the current execution context, including Git commit hash, GCS bucket location, model configuration, and optional user comments.  It then generates a unique system state ID and inserts this data into an 'experiment' BigQuery table.
+
+    Args:
+        session_id (str): A unique identifier for the current user session.
+
+    Returns:
+        str: The generated system state ID.
+    """
+    try:
+        repo = git.Repo(search_parent_directories=True)
+        git_hash = str(repo.head.object.hexsha)
+    except git.exc.InvalidGitRepositoryError:
+        print("Error: git repo not found.")
+        git_hash = str(uuid.uuid5(uuid.NAMESPACE_DNS,os.getcwd()))
+
+    gcs_bucket = Container.config["gcs_source_bucket"]
+    model_name = Container.config["model_name"]
+    temperature = Container.config["temperature"]
+    pipeline_parameters = f"model: {model_name}; temperature: {temperature}; max_tokens: {MAX_OUTPUT_TOKENS}"
+    
+    comments = Container.comments
+    system_state_id = str(uuid.uuid5(uuid.NAMESPACE_DNS,f"{git_hash}-{gcs_bucket}-{pipeline_parameters}-{comments or ''}"))
+    
+    data = {"system_state_id":system_state_id,
+            "session_id":session_id,
+            "github_hash":git_hash,
+            "gcs_bucket_path":gcs_bucket,
+            "pipeline_parameters":pipeline_parameters,
+            "comments":comments,
+            }
+    data = {str(x): str(v) for x, v in data.items()}
+    insert_status = insert_data_to_table("experiment", data)
+    if not insert_status:
+        print(f"Error while logging system state id to bq table. Github hash: {git_hash}; GCS bucket: {gcs_bucket}")
+    Container.system_state_id = system_state_id
+    return system_state_id
+
+def log_question(question: str) -> str:
+    """
+    Logs a question into a BigQuery table and generates a unique question ID.
+
+    This function does the following:
+
+    * **Cleans the Question:** Removes non-alphanumeric characters from the question for ID generation.
+    * **Generates Unique ID:** Creates a question ID using a UUID and the cleaned question text, ensuring uniqueness.
+    * **Prepares Data:**  Formats the question and generated ID into a data structure for insertion.
+    * **Inserts into BigQuery:** Inserts the formatted data into a 'questions' BigQuery table.
+    * **Handles Errors:** Logs an error message if the BigQuery insertion fails.
+
+    Args:
+        question: The raw text of the question.
+
+    Returns:
+        str: The unique question ID.
+    """
+    question_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, re.sub(r"\W", "", question.lower())))
+    data = {"question_id":question_id,
+            "question":question,
+            "parent_question_id":"",
+            }
+    
+    insert_status = insert_data_to_table("questions", data)
+    if not insert_status:
+        print(f"Error while logging question {question} to bq table.")
+
+    Container.question_id = question_id
+    return question_id
+
+def insert_data_to_table(table_name: str, data: dict[str, str]) -> bool:
+    """
+    Inserts a single row of data into a specified BigQuery table.
+
+    This function assumes the data dictionary contains only string values.
+
+    Args:
+        table_name: The name of the target BigQuery table.
+        data: A dictionary containing the data to be inserted, with keys as column names and values as strings.
+
+    Returns:
+        bool: True if the insertion was successful, False otherwise.
+    """
+    client = create_bq_client()
+    dataset_id = get_dataset_id()
+    table = client.get_table(f"{dataset_id}.{table_name}") 
+
+    errors = client.insert_rows_json(table, [data])
+    if errors == []:
+        print("New rows have been added.")
+        return True
+    else:
+        print(f"Errors while inserting rows: {errors}")
+        return False
+
+def get_dataset_id() -> str:
+    """
+    Retrieves the BigQuery dataset ID for the current project.
+
+    The dataset ID combines the project ID and a predefined dataset name (assumed to be globally defined as 'DATASET_NAME').
+
+    Priority for determining the project ID:
+
+    1. **Variable in llm.yaml:** Looks for the 'bq_project_id' config variable.
+    2. **Google Application Default Credentials:** If the environment variable is not found, uses Google's default credentials mechanism.
+
+    Returns:
+        str: The fully constructed BigQuery dataset ID in the format 'project_id.DATASET_NAME'.
+
+    Raises:
+        ValueError: If the project ID cannot be determined from either source.
+    """
+    project_id = Container.config["bq_project_id"]
+    dataset_name = Container.config["dataset_name"]
+    if not project_id:
+        _, project_id = google.auth.default()
+    return f"{project_id}.{dataset_name}"
+
 class BigQueryConverter:
     """
     A utility class for converting query state data into a pandas DataFrame that can be uploaded to BigQuery.
@@ -185,6 +309,8 @@ class BigQueryConverter:
             "plan_and_summaries": [],
         }
         max_round = len(log_snapshots) - 1
+        session_id = Container.session_id if hasattr(Container, "session_id") else str(uuid.uuid4())
+        system_state_id = Container.system_state_id or log_system_status(session_id)
         for round_number, log_snapshot in enumerate(log_snapshots):
             react_round_number = round_number
             response = query_state.answer or ""
@@ -208,8 +334,7 @@ class BigQueryConverter:
 
             tokens_used = query_state.tokens_used if query_state.tokens_used is not None else 0
             prediction_id = str(uuid.uuid4())
-            system_state_id = str(uuid.uuid4())
-            session_id = Container.session_id if hasattr(Container, "session_id") else str(uuid.uuid4())
+            
             timestamp = datetime.datetime.now()
             confidence_score = query_state.confidence_score
             summary = json.dumps([convert_dict_to_summaries(x) for x in log_snapshot["pre_filtered_docs"]])
@@ -222,7 +347,7 @@ class BigQueryConverter:
             data["timestamp"].append(timestamp)
             data["system_state_id"].append(system_state_id)
             data["session_id"].append(session_id)
-            data["question_id"].append("")
+            data["question_id"].append(Container.question_id)
             data["question"].append(query_state.question)
             data["react_round_number"].append(str(react_round_number))
             data["response"].append(response)

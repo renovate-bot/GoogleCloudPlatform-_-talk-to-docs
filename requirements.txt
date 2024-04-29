@@ -42,6 +42,7 @@ fonttools==4.51.0
 frozenlist==1.4.1
 fsspec==2024.3.1
 gcsfs==2024.3.1
+GitPython==3.1.43
 google-ai-generativelanguage==0.6.2
 google-api-core==2.18.0
 google-api-python-client==2.126.0
@@ -58,8 +59,7 @@ google-crc32c==1.5.0
 google-generativeai==0.5.1
 google-resumable-media==2.7.0
 googleapis-common-protos==1.63.0
-gradio==4.26.0
-gradio_client==0.15.1
+gradio==3.50.2
 greenlet==3.0.3
 grpc-google-iam-v1==0.13.0
 grpcio==1.62.1

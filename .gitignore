@@ -284,3 +284,5 @@ gen_ai/vector_store/**
 gen_ai/vector_store_*/
 gen_ai/output_files/**
 output_files/
+.terraform*
+terraform.tfstate*

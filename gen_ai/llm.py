@@ -35,7 +35,7 @@ from langchain.chains import LLMChain
 from langchain.schema import Document
 
 from gen_ai.common.argo_logger import create_log_snapshot, trace_on
-from gen_ai.common.bq_utils import BigQueryConverter, create_bq_client, load_data_to_bq
+from gen_ai.common.bq_utils import BigQueryConverter, create_bq_client, load_data_to_bq, get_dataset_id, log_question
 from gen_ai.common.common import TokenCounter, merge_outputs, remove_duplicates, split_large_document, update_used_docs
 from gen_ai.common.ioc_container import Container
 from gen_ai.common.memorystore_utils import serialize_previous_conversation
@@ -201,6 +201,7 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
 
     query_state = conversation.exchanges[-1]
     question = query_state.question
+    log_question(question)
 
     query_state.react_rounds = []
     log_snapshots = []
@@ -385,7 +386,10 @@ def respond(conversation: Conversation, member_info: dict) -> Conversation:
 
     df = BigQueryConverter.convert_query_state_to_prediction(conversation.exchanges[-1], log_snapshots)
     client = create_bq_client()
-    load_data_to_bq(client, "chertushkin-genai-sa.uhg.prediction", schema_prediction, df)
+    dataset_id = get_dataset_id()
+    table_id = f"{dataset_id}.prediction"
+    load_data_to_bq(client, table_id, schema_prediction, df)
+
 
     return conversation
 

@@ -13,6 +13,12 @@ temperature: 0.5
 personalization: true
 debug_info: false
 use_full_documents: true
+bq_project_id: chertushkin-genai-sa
+dataset_name: uhg
+terraform_credentials: /home/chertushkin/terraform-service-account-credentials.json
+terraform_instance_name: talk-to-docs-instance
+terraform_redis_name: talk-to-docs-redis-instance
+gcs_source_bucket: gs://uhg_data/extractions_20240418
 
 is_debug: false
 gradio_root_path: /t2x-mig-ui

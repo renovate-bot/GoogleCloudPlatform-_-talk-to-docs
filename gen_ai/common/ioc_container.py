@@ -188,3 +188,6 @@ class Container(containers.DeclarativeContainer):
 
     debug_info = config.get("debug_info", False)
     redis_db = providers.Singleton(provide_redis)
+    comments = "None"
+    system_state_id = None
+    question_id = None
