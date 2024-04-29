@@ -23,6 +23,7 @@ jobs:
     - uses: 'google-github-actions/auth@v2'
       with:
         project_id: 'chertushkin-genai-sa'
+        service_account: '${{ secrets.SERVICE_ACCOUNT }}'
         workload_identity_provider: '${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}'
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
