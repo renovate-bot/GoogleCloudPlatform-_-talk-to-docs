@@ -33,3 +33,57 @@ If you have any questions or need assistance, feel free to reach out to the proj
 
 Happy GenAI development!
 
+
+## Setting up
+To begin development you can use 2 different approaches: using Python Environment or using Docker. Below are instructions for each approach.
+
+### Setting up Python Environment
+Make sure to install miniconda environment:
+```
+cd ~/
+mkdir -p ~/miniconda3
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh
+bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
+~/miniconda3/bin/conda init bash
+```
+After that just install the package in editable mode:
+
+```
+pip install -e .
+```
+
+### Setting up Docker
+If this is your first time, you probably don't have Docker installed on VM. Execute the following commands:
+```
+sudo apt update && sudo apt upgrade
+sudo apt install make
+sudo apt install docker.io
+sudo groupadd docker
+sudo usermod -aG docker $USER
+sudo chmod 777 /var/run/docker.sock
+```
+
+### Setting up environment
+
+```
+make build && make container
+```
+
+If you want to remove it, execute:
+
+```
+make clean
+```
+
+
+### Copying resources
+
+Make sure `gcs_source_bucket` field in `llm.yaml` is up to date with the latest extraction in use. Then run the copying python script:
+```
+python gen_ai/copy_resources.py
+```
+
+
+### Updating BigQuery table
+
+It is currently set up that all the runs are logged into "uhg" dataset in "chertushkin-genai-sa" project. To change the project id - change `bq_project_id` field of `llm.yaml` file. If you receive an error in logging, check if the service account is added to BigQuery IAM of "chertushkin-genai-sa" project. Or whatever the project you specified in the config.

@@ -1,0 +1,6 @@
+docx_extraction: default
+docx_chunking: combo
+xml_chunking: default
+json_chunking: b360
+pdf_extraction: default
+pdf_chunking: default
