@@ -42,5 +42,5 @@ jobs:
         pylint gen_ai/llm.py
     - name: Test with pytest
       run: |
-        mkdir /mnt/resources/uhg/main_folder
+        mkdir -p /mnt/resources/uhg/main_folder
         pytest gen_ai/tests
