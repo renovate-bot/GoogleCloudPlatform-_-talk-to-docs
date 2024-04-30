@@ -147,7 +147,7 @@ def retrieve_initial_documents(
     questions_for_search = question + "\n" + similar_questions
     questions_for_search = questions_for_search.split("?")
     questions_for_search = [x.replace("\n", "").strip() for x in questions_for_search]
-    questions_for_search = [f"{x}?" for x in questions_for_search if x][0:2]
+    questions_for_search = [f"{x}?" for x in questions_for_search if x][0:similar_questions_number+1]
     Container.logger().info(msg=f"Questions after processing:\n {questions_for_search}")
 
     retrieved_docs, post_filtered_docs = perform_retrieve_round(
