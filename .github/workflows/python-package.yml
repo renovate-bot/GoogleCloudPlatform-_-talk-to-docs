@@ -40,7 +40,12 @@ jobs:
       run: |
         # stop the build if there are Python syntax errors or undefined names
         pylint gen_ai/llm.py
+    - name: Create directory structure in writable area
+      run: mkdir -p $HOME/resources/uhg/main_folder
+    - name: Create symlink
+      run: |
+        sudo ln -s $HOME/resources /mnt/resources
+        echo "Directory structure created and symlinked"
     - name: Test with pytest
       run: |
-        mkdir -p /mnt/resources/uhg/main_folder
         pytest gen_ai/tests
