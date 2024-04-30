@@ -14,6 +14,7 @@ import os
 import shutil
 import subprocess
 
+import click
 from gen_ai.common import common
 from gen_ai.constants import LLM_YAML_FILE
 
@@ -59,8 +60,9 @@ def copy_from_gcs(gcs_bucket: str, destination_folder: str):
     except subprocess.CalledProcessError as e:
         print(f"gsutil copy failed: {e.stderr.decode('utf-8')}")
 
-
-def copy_resources():
+@click.command()
+@click.argument("gcs_source_bucket", required=False)
+def copy_resources(gcs_source_bucket: str | None = None):
     """Copies resources from a Google Cloud Storage (GCS) bucket to a local directory.
 
     This function performs the following steps:
@@ -77,7 +79,7 @@ def copy_resources():
 
     config = common.load_yaml(LLM_YAML_FILE)
     base_path = "/mnt/resources"
-    gcs_bucket = config["gcs_source_bucket"]
+    gcs_bucket = gcs_source_bucket or config["gcs_source_bucket"]
     dataset_name = config["dataset_name"]
 
     if not os.path.exists(base_path):

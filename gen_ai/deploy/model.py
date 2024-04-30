@@ -90,6 +90,7 @@ class LLMOutput(BaseModel):
         sections_to_b360 (list[str]): A list of sections or identifiers within a broader system
                                       (like B360) that are relevant to the response. This is useful
                                       for integrating the AI's responses with other systems or databases.
+        confidence_score (str): The conversation confidence_score, indicating how confident was the answer.
 
     Note:
         The attributes `plan_and_summaries`, `additional_information_to_retrieve`, `context_used`,
