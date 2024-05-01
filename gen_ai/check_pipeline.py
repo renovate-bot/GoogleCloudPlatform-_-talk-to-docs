@@ -125,10 +125,10 @@ def run_pipeline(mode: Literal["batch", "step"] = "step", csv_path: str = None, 
             Container.logger().info(msg=f"Answer: {answer}")
     elif mode == "step":
         start = default_timer()
-        for idx, input_query in enumerate(["I injured my back. Is massage therapy covered?"]):
+        for idx, input_query in enumerate(["Do I have a copay for a routine colonoscopy?"]):
             Container.logger().info(msg=f"Asking question {idx} in document ")
             Container.logger().info(msg=f"Question: {input_query}")
-            answer = run_single_prediction(input_query, {"set_number": "005acis"})
+            answer = run_single_prediction(input_query, {"set_number": "001acis"})
             Container.logger().info(msg=f"Answer: {answer}")
         end = default_timer()
         print(f"Total flow took {end - start} seconds")

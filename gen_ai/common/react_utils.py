@@ -136,24 +136,29 @@ def score_document(
     - This method does not catch all exceptions explicitly. In case of an unexpected error, it defaults the relevancy
       score to 0 and prints the raw output for inspection.
     """
-    output = {}
-    doc_content = doc.page_content if Container.config.get("use_full_documents", False) else doc.metadata["summary"]
-    try:
-        output_raw = retriever_scoring_chain.run(retrieved_doc=doc_content, question=question)
+    use_relevancy_score = Container.config.get("use_relevancy_score", False)
+    relevancy_score = 0
+    relevancy_reasoning = "The text could not be scored"
+
+    if use_relevancy_score:
+        output = {}
+        doc_content = doc.page_content if Container.config.get("use_full_documents", False) else doc.metadata["summary"]
         try:
-            output_raw = output_raw.replace("```json", "").replace("```", "")
-            output = json5.loads(output_raw)
-        except Exception:  # pylint: disable=W0718
-            json_output = json_corrector_chain.run(json=output_raw)
-            json_output = json_output.replace("```json", "").replace("```", "")
-            output = json5.loads(json_output)
-        relevancy_score = int(output["relevancy_score"])
-        relevancy_reasoning = output["relevancy_reasoning"]
-    except Exception as e:  # pylint: disable=W0718
-        print("Error in parsing the document for relevancy score")
-        print(str(e))
-        relevancy_score = 0
-        relevancy_reasoning = "Failed to assign relevant score"
+            output_raw = retriever_scoring_chain.run(retrieved_doc=doc_content, question=question)
+            try:
+                output_raw = output_raw.replace("```json", "").replace("```", "")
+                output = json5.loads(output_raw)
+            except Exception:  # pylint: disable=W0718
+                json_output = json_corrector_chain.run(json=output_raw)
+                json_output = json_output.replace("```json", "").replace("```", "")
+                output = json5.loads(json_output)
+            relevancy_score = int(output["relevancy_score"])
+            relevancy_reasoning = output["relevancy_reasoning"]
+        except Exception as e:  # pylint: disable=W0718
+            print("Error in parsing the document for relevancy score")
+            print(str(e))
+            relevancy_score = 0
+            relevancy_reasoning = "Failed to assign relevant score"
 
     doc.metadata["relevancy_score"] = relevancy_score
     doc.metadata["relevancy_reasoning"] = relevancy_reasoning
@@ -387,7 +392,8 @@ def summarize_and_score_documents(
     docs_and_scores = score_retrieved_documents(docs_and_scores, question)
     if Container.debug_info:
         print_doc_summary_and_relevance(docs_and_scores)
-    docs_and_scores = [x for x in docs_and_scores if x.metadata["relevancy_score"] >= threshold]
+    if Container.config['use_relevancy_score']:
+        docs_and_scores = [x for x in docs_and_scores if x.metadata["relevancy_score"] >= threshold]
     if Container.debug_info:
         print("---- Filtered documents ----")
         print(*[d.metadata["section_name"] for d in docs_and_scores], sep="\n")

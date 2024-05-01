@@ -111,10 +111,12 @@ class SemanticDocumentRetriever(DocumentRetriever):
         if metadata is not None and len(metadata) > 1:
             metadata = convert_to_chroma_format(metadata)
 
-        ss_docs = store.similarity_search(query=questions_for_search, k=5, filter=metadata)
+        ss_docs = store.similarity_search_with_score(query=questions_for_search, k=50, filter=metadata)
+        ss_docs = ss_docs[0:3]
+        ss_docs = [x[0] for x in ss_docs]
 
         mmr_docs = store.max_marginal_relevance_search(
-            query=questions_for_search, k=6, lambda_mult=0.3, filter=metadata
+            query=questions_for_search, k=2, lambda_mult=0.5, filter=metadata
         )
         docs = common.remove_duplicates(ss_docs + mmr_docs)
 
