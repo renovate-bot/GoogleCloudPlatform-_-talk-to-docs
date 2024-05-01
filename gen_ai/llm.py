@@ -250,6 +250,7 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
 
         round_outputs = []
         for selected_context in contexts:
+            llm_start_time = default_timer()
             output_raw = react_chain().run(
                 include_run_info=True,
                 return_only_outputs=False,
@@ -259,6 +260,8 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
                 round_number=round_number,
                 final_round_statement=final_round_statement,
             )
+            llm_end_time = default_timer()
+            Container.logger().info(f"Generating main LLM answer took {llm_end_time - llm_start_time} seconds")
             attempts = 2
             done = False
             while not done:
