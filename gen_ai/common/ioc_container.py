@@ -177,7 +177,7 @@ class Container(containers.DeclarativeContainer):
         provide_chain, "retriever_scoring_prompt", ["retrieved_doc", "question"], "text", scoring_llm
     )
     similar_questions_chain = providers.Singleton(
-        provide_chain, "similar_questions_prompt", ["question"], "similar_questions"
+        provide_chain, "similar_questions_prompt", ["question", "similar_questions_number"], "similar_questions"
     )
 
     token_counter = providers.Singleton(common.provide_token_counter)

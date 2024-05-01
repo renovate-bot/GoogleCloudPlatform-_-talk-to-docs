@@ -130,17 +130,26 @@ def retrieve_initial_documents(
         relevant queries based on the initial question. Error handling for language model operations and vector store
         interactions is encapsulated within the retrieval functions.
     """
-    similar_questions_chain: LLMChain = Container.similar_questions_chain()
 
     if "?" not in question:
         question = f"{question}?"
-    similar_questions = similar_questions_chain.run(question)
-    Container.logger().info(msg=f"Questions:\n {similar_questions}")
+        
+    similar_questions = ""
+    similar_questions_number = Container.config["similar_questions_number"]
 
-    questions_for_search = question + "\n" + similar_questions
-    questions_for_search = questions_for_search.split("?")
-    questions_for_search = [x.replace("\n", "").strip() for x in questions_for_search]
-    questions_for_search = [f"{x}?" for x in questions_for_search if x][0:2]
+    if similar_questions_number:
+        similar_questions_chain: LLMChain = Container.similar_questions_chain()
+        similar_questions = similar_questions_chain.run(question=question, 
+                                                        similar_questions_number=similar_questions_number
+                                                        )
+        Container.logger().info(msg=f"Questions:\n {similar_questions}")
+        questions_for_search = question + "\n" + similar_questions
+        questions_for_search = questions_for_search.split("?")
+        questions_for_search = [x.replace("\n", "").strip() for x in questions_for_search]
+        questions_for_search = [f"{x}?" for x in questions_for_search if x][0:similar_questions_number+1]
+    else:
+        questions_for_search = [question]
+
     Container.logger().info(msg=f"Questions after processing:\n {questions_for_search}")
 
     retrieved_docs, post_filtered_docs = perform_retrieve_round(

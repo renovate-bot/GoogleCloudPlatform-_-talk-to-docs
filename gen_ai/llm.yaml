@@ -20,6 +20,7 @@ terraform_credentials: /home/chertushkin/terraform-service-account-credentials.j
 terraform_instance_name: talk-to-docs-instance
 terraform_redis_name: talk-to-docs-redis-instance
 gcs_source_bucket: gs://uhg_data/extractions_20240501
+similar_questions_number: 0
 
 is_debug: false
 gradio_root_path: /t2x-mig-ui
@@ -205,7 +206,7 @@ similar_questions_prompt: |
     - If the question is very short, anticipate what else they may want to know.
     - Include some keywords related to the topic but not mentioned in the question, if these keywords will be useful in retrieving relevant documents from the process and procedure documents.
     - Return only the similar questions without any introductory text.
-    - Limit the number of similar questions to 2.
+    - Limit the number of similar questions to {similar_questions_number}.
     - Do not output numbers in front of questions. Do not output "-" symbol in front of questions.
     - Separate questions with "?" symbol.
   </Instructions>
