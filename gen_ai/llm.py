@@ -368,11 +368,14 @@ def fill_query_state_with_doc_attributes(query_state: QueryState, post_filtered_
     """
     Updates the provided query_state object with attributes extracted from documents after filtering.
 
-    This function modifies the query_state object by setting various attributes based on the metadata of documents in the post_filtered_docs list. It processes documents to categorize them by their data source (B360, KM or MP from KC), and updates the query_state with URLs, and categorized attributes for each type.
+    This function modifies the query_state object by setting various attributes based on the metadata of documents 
+    in the post_filtered_docs list. It processes documents to categorize them by their data source 
+    (B360, KM or MP from KC), and updates the query_state with URLs, and categorized attributes for each type.
 
     Args:
         query_state (QueryState): The query state object that needs to be updated with document attributes.
-        post_filtered_docs (list[Document]): A list of Document objects that have been filtered and whose attributes are to be extracted.
+        post_filtered_docs (list[Document]): A list of Document objects that have been filtered and whose attributes 
+        are to be extracted.
 
     Returns:
         QueryState: The updated query state object with new attributes set based on the provided documents.
@@ -399,14 +402,20 @@ def fill_query_state_with_doc_attributes(query_state: QueryState, post_filtered_
     kc_mp_docs = [x for x in kc_docs if x.metadata["policy_number"]]
 
     attributes_to_kc_km = [
-        {"doc_type": "km", "doc_identifier": x.metadata["doc_identifier"], "url": x.metadata["url"], "section_name": x.metadata['section_name']} for x in kc_km_docs
+        {
+            "doc_type": "km",
+            "doc_identifier": x.metadata["doc_identifier"],
+            "url": x.metadata["url"],
+            "section_name": x.metadata["section_name"],
+        }
+        for x in kc_km_docs
     ]
     attributes_to_kc_mp = [
         {
             "doc_type": "mp",
             "original_filepath": x.metadata["original_filepath"],
             "policy_number": x.metadata["policy_number"],
-            "section_name": x.metadata['section_name']
+            "section_name": x.metadata["section_name"],
         }
         for x in kc_mp_docs
     ]
