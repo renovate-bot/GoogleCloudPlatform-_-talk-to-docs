@@ -125,6 +125,12 @@ def generate_contexts_from_docs(docs_and_scores: list[Document], query_state: Qu
 
     Container.logger().info(msg=f"Docs used: {num_docs_used}, tokens used: {token_counts}")
     Container.logger().info(msg=f"Doc names with relevancy scores: {query_state.used_articles_with_scores}")
+
+    doc_attributes = [
+        (x.metadata["original_filepath"], x.metadata["doc_identifier"], x.metadata["section_name"])
+        for x in docs_and_scores
+    ]
+    Container.logger().info(msg=f"Doc attributes: {doc_attributes}")
     return contexts
 
 
@@ -159,7 +165,7 @@ def get_total_count(question: str, selected_context: str, previous_rounds: str, 
 
     Note:
         The token count helps in managing inputs to language models, especially when dealing with models that have
-        a maximum token input limit. Ensuring that the prompt does not exceed this limit is crucial for 
+        a maximum token input limit. Ensuring that the prompt does not exceed this limit is crucial for
         effective processing.
     """
     react_chain: LLMChain = Container.react_chain
@@ -247,6 +253,7 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
 
         round_outputs = []
         for selected_context in contexts:
+            llm_start_time = default_timer()
             output_raw = react_chain().run(
                 include_run_info=True,
                 return_only_outputs=False,
@@ -256,6 +263,8 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
                 round_number=round_number,
                 final_round_statement=final_round_statement,
             )
+            llm_end_time = default_timer()
+            Container.logger().info(f"Generating main LLM answer took {llm_end_time - llm_start_time} seconds")
             attempts = 2
             done = False
             while not done:
@@ -389,7 +398,6 @@ def respond(conversation: Conversation, member_info: dict) -> Conversation:
     dataset_id = get_dataset_id()
     table_id = f"{dataset_id}.prediction"
     load_data_to_bq(client, table_id, schema_prediction, df)
-
 
     return conversation
 

@@ -7,18 +7,19 @@ embeddings_model_name: textembedding-gecko@003
 vector_name: chroma
 document_retriever: semantic
 api_mode: stateless
-max_rounds: 3
+max_rounds: 1
 print_system_metrics: true
 temperature: 0.5
 personalization: true
 debug_info: false
 use_full_documents: true
+use_relevancy_score: false
 bq_project_id: chertushkin-genai-sa
 dataset_name: uhg
 terraform_credentials: /home/chertushkin/terraform-service-account-credentials.json
 terraform_instance_name: talk-to-docs-instance
 terraform_redis_name: talk-to-docs-redis-instance
-gcs_source_bucket: gs://uhg_data/extractions_20240418
+gcs_source_bucket: gs://uhg_data/extractions_20240501
 similar_questions_number: 0
 
 is_debug: false
@@ -211,6 +212,19 @@ similar_questions_prompt: |
   </Instructions>
  
   Here is the question asked by an employee: {question}?
+
+simple_react_chain_prompt: |
+  You will be given context, which contains documents. You will need to answer the question based on the context.
+  Here is the context: {context}
+
+  Here is the question: {question}
+  You need to provide the response in JSON format:
+  {{
+    "plan_and_summaries": "",
+    "answer": "Here provide the answer to the question",
+    "additional_information_to_retrieve": "",
+    "context_used": ""
+  }}
 
 react_chain_prompt: |
   You are a smart, friendly and helpful chatbot for United Healthcare. 
