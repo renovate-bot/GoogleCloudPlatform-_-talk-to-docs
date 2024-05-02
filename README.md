@@ -1,6 +1,8 @@
 # Solution Accelerators for GenAI
 This repository contains platform code for accelerating development of GenAI solutions in Applied AI Engineering team
 
+![alt text](resources/image.png)
+
 # Structure
 
 - **docs**: This directory contains documentation, user guides, and any other resources that help you understand and use the GenAI solution accelerators effectively.
