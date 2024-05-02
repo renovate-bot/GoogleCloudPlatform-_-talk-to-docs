@@ -339,7 +339,7 @@ class BigQueryConverter:
             summary = json.dumps([convert_dict_to_summaries(x) for x in log_snapshot["pre_filtered_docs"]])
             relevance_score = json.dumps([convert_dict_to_relevancies(x) for x in log_snapshot["pre_filtered_docs"]])
             additional_question = log_snapshot["additional_information_to_retrieve"]
-            plan_and_summaries = log_snapshot["plan_and_summaries"]
+            plan_and_summaries = str(log_snapshot["plan_and_summaries"])
 
             data["user_id"].append(getpass.getuser())
             data["prediction_id"].append(prediction_id)

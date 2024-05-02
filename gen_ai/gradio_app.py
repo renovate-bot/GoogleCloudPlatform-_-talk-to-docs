@@ -10,11 +10,12 @@ from datetime import datetime
 import customer
 import gradio as gr
 import llm
+from dotenv import load_dotenv
 
-from gen_ai.constants import (FAVICON_PATH, LOGS_DIRECTORY, SSL_CERTFILE,
-                              SSL_KEYFILE, USERS_FILE)
+from gen_ai.constants import FAVICON_PATH, LOGS_DIRECTORY, SSL_CERTFILE, SSL_KEYFILE, USERS_FILE
 from gen_ai.deploy.model import Conversation, QueryState
 from gen_ai.common.ioc_container import Container
+
 # TODO: temp fix with sqlite3. Need to look into in on Monday.
 # For now the goal is to make sure it can work fine
 __import__("pysqlite3")
@@ -171,14 +172,17 @@ def feedback(
     }
 
 
-# Used for authentication.
-default_auth_users = {
-    "usr": "pwd",
-    "username": "password",
-}
-
-
 def authenticate(username, password):
+    # Default user and password, stored in .env file (not commited to github)
+    gradio_user = os.getenv("gradio_user")
+    gradio_password = os.getenv("gradio_password")
+    if gradio_user is None or gradio_password is None:
+        raise ValueError("You forgot to populate user and password in .env file")
+
+    default_auth_users = {
+        gradio_user: gradio_password,
+    }
+
     auth_users = {}
     if os.path.isfile(USERS_FILE):
         with open(USERS_FILE, "r", encoding="utf-8") as users_file:
@@ -193,6 +197,7 @@ def authenticate(username, password):
 
 
 if __name__ == "__main__":
+    load_dotenv()
     # disable for now, we will need to dive deeper why it stopped working with gradio
     # container = Container()
     # container.init_resources()
@@ -311,13 +316,16 @@ if __name__ == "__main__":
             )
 
         with gr.Group():
-            good_answer_dropdown = gr.Dropdown(container=True,
+            good_answer_dropdown = gr.Dropdown(
+                container=True,
                 label="Was the answer accurate and complete? (Required)",
-                choices=["5 = Completely accurate and complete (The information was correct and included all necessary details.)", 
-                         "4 = Very accurate and complete (The information was correct and included most, if not all, relevant details.)",
-                         "3 = Mostly accurate and complete (The information was mostly correct but might have missed some minor details.)",
-                         "2 = Somewhat inaccurate or incomplete (The information had some errors or lacked some important details.)",
-                         "1 = Not at all accurate or complete (The information was mostly wrong or missing important details.)"],
+                choices=[
+                    "5 = Completely accurate and complete (The information was correct and included all necessary details.)",
+                    "4 = Very accurate and complete (The information was correct and included most, if not all, relevant details.)",
+                    "3 = Mostly accurate and complete (The information was mostly correct but might have missed some minor details.)",
+                    "2 = Somewhat inaccurate or incomplete (The information had some errors or lacked some important details.)",
+                    "1 = Not at all accurate or complete (The information was mostly wrong or missing important details.)",
+                ],
                 visible=False,
             )
             with gr.Row():
@@ -394,7 +402,7 @@ if __name__ == "__main__":
                 ["Do I have a copay for a routine colonoscopy?"],
                 ["Can my partner be covered under my plan?"],
                 ["Now that I've lost my employment, will my dependents be covered under COBRA?"],
-                ["What is the effective date of my current coverage?"]
+                ["What is the effective date of my current coverage?"],
             ],
             inputs=prompt_box,
             outputs=chatbot,
@@ -409,12 +417,12 @@ if __name__ == "__main__":
         print("Starting UI server...")
         gr.close_all()
         gradio_app.launch(
-            debug=Container.config.get('is_debug', False),
+            debug=Container.config.get("is_debug", False),
             show_error=True,
             max_threads=2,
             favicon_path=FAVICON_PATH_USED,
             show_api=False,
-            root_path=Container.config.get('gradio_root_path', None),
+            root_path=Container.config.get("gradio_root_path", None),
             server_name=server_name,
             server_port=int(os.environ.get("PORT", 7860)),
             auth=authenticate,
