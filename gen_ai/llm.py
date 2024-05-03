@@ -45,7 +45,7 @@ from gen_ai.common.retriever import perform_retrieve_round, retrieve_initial_doc
 from gen_ai.common.statefullness import resolve_and_enrich, serialize_response
 from gen_ai.constants import MAX_CONTEXT_SIZE
 from gen_ai.create_tables import schema_prediction
-from gen_ai.deploy.model import Conversation, PersonalizedData, QueryState
+from gen_ai.deploy.model import Conversation, PersonalizedData, QueryState, transform_to_dictionary
 
 
 @inject
@@ -467,7 +467,7 @@ def respond(conversation: Conversation, member_info: dict) -> Conversation:
     return conversation
 
 
-def respond_api(question: str, member_context_full: PersonalizedData) -> Conversation:
+def respond_api(question: str, member_context_full: PersonalizedData | dict[str, str]) -> Conversation:
     """
     Provides an API-like interface to handle and respond to a new question within a conversation context.
 
@@ -485,6 +485,8 @@ def respond_api(question: str, member_context_full: PersonalizedData) -> Convers
     Raises:
         Exception: If the conversation processing fails at any step.
     """
+    if isinstance(member_context_full, PersonalizedData):
+        member_context_full = transform_to_dictionary(member_context_full)
     query_state = QueryState(question=question, all_sections_needed=[])
     conversation = Conversation(exchanges=[query_state])
     conversation = respond(conversation, member_context_full)

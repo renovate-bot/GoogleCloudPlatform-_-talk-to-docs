@@ -21,6 +21,21 @@ from typing import Any
 from pydantic import BaseModel
 
 
+def transform_to_dictionary(base_model: BaseModel) -> dict:
+    """
+    Transform a Pydantic BaseModel instance into a dictionary containing only
+    attributes that do not have their default values.
+
+    Args:
+        base_model (BaseModel): An instance of a Pydantic BaseModel.
+
+    Returns:
+        dict: A dictionary with keys and values from the BaseModel instance where
+              the values are not equal to their defined default values.
+    """
+    return {k: v for k, v in base_model.model_dump().items() if v != base_model.model_fields[k].default}
+
+
 class PersonalizedData(BaseModel):
     member_id: str = ""
     policy_title: str = ""
@@ -100,7 +115,7 @@ class LLMOutput(BaseModel):
                                 - Section Name (exists for all: B360, KC KM, KC MP)
                                 This can help users to explore related topics or verify information.
         attributes_to_b360 (list[dict[str, str]]): A list of tuples:
-                                - Set number, exists only in b360 
+                                - Set number, exists only in b360
                                 - Section name, name of the chunk from B360
                                 This is useful for integrating the AI's responses with other systems or databases.
         confidence_score (str): The conversation confidence_score, indicating how confident was the answer.
@@ -166,8 +181,7 @@ class QueryState:
     confidence_score: int = field(default=0)
     attributes_to_kc_km: list[dict[str, str, str]] = field(default_factory=list)
     attributes_to_kc_mp: list[dict[str, str, str]] = field(default_factory=list)
-    attributes_to_b360: list[dict[str, str]]= field(default_factory=list)
-
+    attributes_to_b360: list[dict[str, str]] = field(default_factory=list)
 
 
 @dataclass
