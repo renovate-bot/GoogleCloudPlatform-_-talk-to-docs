@@ -40,7 +40,7 @@ from gen_ai.common.bq_utils import BigQueryConverter, create_bq_client, load_dat
 from gen_ai.common.common import TokenCounter, merge_outputs, remove_duplicates, split_large_document, update_used_docs
 from gen_ai.common.ioc_container import Container
 from gen_ai.common.memorystore_utils import serialize_previous_conversation
-from gen_ai.common.react_utils import get_confidence_score
+from gen_ai.common.react_utils import get_confidence_score, filter_non_relevant_previous_conversations
 from gen_ai.common.retriever import perform_retrieve_round, retrieve_initial_documents
 from gen_ai.common.statefullness import resolve_and_enrich, serialize_response
 from gen_ai.constants import MAX_CONTEXT_SIZE
@@ -214,7 +214,10 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
     log_snapshots = []
     round_number = len(query_state.react_rounds) + 1
     if len(conversation.exchanges) > 1 and config.get("api_mode") == "stateful":
-        previous_context = serialize_previous_conversation(conversation.exchanges[-2])
+        number_of_previous_conversations = config.get("previous_conversations_number")
+        previous_conversations = conversation.exchanges[:-1][-(number_of_previous_conversations):]
+        relevant_previous_conversations = filter_non_relevant_previous_conversations(previous_conversations, question)
+        previous_context = serialize_previous_conversation(relevant_previous_conversations[::-1])
     else:
         previous_context = ""
 
@@ -449,6 +452,9 @@ def respond(conversation: Conversation, member_info: dict) -> Conversation:
     api_mode = Container.config.get("api_mode", "stateless")
     statefullness_enabled = api_mode == "stateful"
     if statefullness_enabled:
+        if 'member_id' not in member_info:
+            Container.logger().error("Stateful API is enabled, but no member_id was provided")
+            raise ValueError('Member id is not provided for Stateful API and Multi-Turn')
         conversation = resolve_and_enrich(conversation)
 
     conversation, log_snapshots = generate_response_react(conversation)

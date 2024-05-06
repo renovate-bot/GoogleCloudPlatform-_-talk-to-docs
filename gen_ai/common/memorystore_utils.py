@@ -165,7 +165,7 @@ def get_query_states_from_memorystore(personalized_info: PersonalizedData) -> Li
     return matching_query_states
 
 
-def serialize_previous_conversation(query_state: QueryState) -> str:
+def serialize_previous_conversation(query_states: list[QueryState]) -> str:
     """
     Serializes the content of a previous conversation from a query state into a formatted string.
 
@@ -174,7 +174,7 @@ def serialize_previous_conversation(query_state: QueryState) -> str:
     be used for logging, debugging, or displaying past interaction context in a user interface.
 
     Args:
-        query_state (QueryState): The query state object containing details of the previous conversation
+        query_states (list[QueryState]): The list of query state objects containing details of the previous conversation
                                   including the question asked, the answer given, and any additional
                                   information that was required.
 
@@ -184,13 +184,17 @@ def serialize_previous_conversation(query_state: QueryState) -> str:
     Example:
         >>> query_state = QueryState(question="What is the capital of France?", answer="Paris",
                                      additional_information_to_retrieve="Population details")
-        >>> serialized_conversation = serialize_previous_conversation(query_state)
+        >>> serialized_conversation = serialize_previous_conversation([query_state])
         >>> print(serialized_conversation)
-        Previous question was: What is the capital of France?
-        Previous answer was: Paris
-        Previous additional information to retrieve: Population details
+        Previous question #1 was: What is the capital of France?
+        Previous answer #1 was: Paris
+        Previous additional information to retrieve #1: Population details
     """
-    return f"""
-    Previous question was: {query_state.question}
-    Previous answer was: {query_state.answer} 
-    Previous additional information to retrieve: {query_state.additional_information_to_retrieve}"""
+    serialized_previous_conversation = []
+    for i, query_state in enumerate(query_states):
+        response = f"""
+        Previous question #{i} was: {query_state.question}
+        Previous answer #{i} was: {query_state.answer} 
+        Previous additional information to retrieve #{i} was: {query_state.additional_information_to_retrieve}"""
+        serialized_previous_conversation.append(response)
+    return "\n".join(serialized_previous_conversation)
