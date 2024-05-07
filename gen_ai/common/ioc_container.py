@@ -64,7 +64,7 @@ def provide_chain(template_name: str, input_variables: list[str], output_key: st
     llm = llm or Container.llm
     template = Container.config[template_name].strip()
     answer_template = PromptTemplate(input_variables=input_variables, template=template)
-    chain = LLMChain(llm=llm, prompt=answer_template, output_key=output_key, verbose=False)
+    chain = LLMChain(llm=llm, prompt=answer_template, output_key=output_key, verbose=False, llm_kwargs={"response_mime_type":"application/json"})
     return LLMExponentialRetryWrapper(chain)
 
 

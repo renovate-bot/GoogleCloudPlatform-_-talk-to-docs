@@ -14,12 +14,13 @@ personalization: true
 debug_info: false
 use_full_documents: true
 use_relevancy_score: false
+use_mmr: false
 bq_project_id: chertushkin-genai-sa
 dataset_name: uhg2
 terraform_credentials: /home/chertushkin/terraform-service-account-credentials.json
 terraform_instance_name: talk-to-docs-instance
 terraform_redis_name: talk-to-docs-redis-instance
-gcs_source_bucket: gs://uhg_data/extractions_20240501
+gcs_source_bucket: gs://uhg_data/extractions_20240418
 similar_questions_number: 0
 previous_conversations_number: 2
 
@@ -259,15 +260,21 @@ similar_questions_prompt: |
 
 simple_react_chain_prompt: |
   You will be given context, which contains documents. You will need to answer the question based on the context.
+  <Instructions>
+    - The context will come as documents, separated with DOCUMENT TITLE and DOCUMENT CONTENT
+    - Include only relevant paragraphs of texts into "context_used". Separate the relevant paragraphs of text the same way as they were given in the context with DOCUMENT TITLE and DOCUMENT CONTENT
+    - Include follow-up question into "additional_information_to_retrieve"
+    - Write the plan of answer and reasoning into "plan_and_summaries"
+  </Instructions>
   Here is the context: {context}
 
   Here is the question: {question}
   You need to provide the response in JSON format:
   {{
-    "plan_and_summaries": "",
+    "plan_and_summaries": "Here provide plan of answer and reasoning about it",
     "answer": "Here provide the answer to the question",
-    "additional_information_to_retrieve": "",
-    "context_used": ""
+    "additional_information_to_retrieve": "Here provide follow-up question",
+    "context_used": "Here provide the relevant paragraphs of text"
   }}
 
 react_chain_prompt: |

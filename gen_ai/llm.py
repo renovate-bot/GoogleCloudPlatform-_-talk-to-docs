@@ -48,6 +48,37 @@ from gen_ai.create_tables import schema_prediction
 from gen_ai.deploy.model import Conversation, PersonalizedData, QueryState, transform_to_dictionary
 
 
+def build_doc_title(metadata: dict[str, str]) -> str:
+    """Constructs a document title string based on provided metadata.
+
+    This function takes a dictionary containing various metadata fields,
+    including "set_number," "section_name," "doc_identifier," and "policy_number."
+    It concatenates these values to form a document title string.
+
+    Args:
+        metadata (dict[str, str]): A dictionary with potential metadata fields.
+            - "set_number": An identifier representing the set number.
+            - "section_name": The name of the relevant section.
+            - "doc_identifier": A unique identifier for the document.
+            - "policy_number": The specific number of the associated policy.
+
+    Returns:
+        str: A concatenated string containing the document title information
+        based on the provided metadata fields.
+
+    """
+    doc_title = ""
+    if metadata["set_number"]:
+        doc_title += metadata["set_number"] + " "
+    if metadata["section_name"]:
+        doc_title += metadata["section_name"] + " "
+    if metadata["doc_identifier"]:
+        doc_title += metadata["doc_identifier"] + " "
+    if metadata["policy_number"]:
+        doc_title += metadata["policy_number"] + " "
+    return doc_title
+
+
 @inject
 @trace_on("Generating context from documents", measure_time=True)
 def generate_contexts_from_docs(docs_and_scores: list[Document], query_state: QueryState) -> list[str]:
@@ -114,6 +145,10 @@ def generate_contexts_from_docs(docs_and_scores: list[Document], query_state: Qu
 
             used_articles.append((f"{filename} Context: {len(contexts)}", doc.metadata["relevancy_score"]))
             token_counts[-1] += doc_tokens
+
+            contexts[-1] += "DOCUMENT TITLE: "
+            contexts[-1] += build_doc_title(doc.metadata) + "\n"
+            contexts[-1] += "DOCUMENT CONTENT: "
             contexts[-1] += doc_chunk
             contexts[-1] += "\n" + "-" * 12 + "\n"
             num_docs_used[-1] += 1
@@ -371,13 +406,13 @@ def fill_query_state_with_doc_attributes(query_state: QueryState, post_filtered_
     """
     Updates the provided query_state object with attributes extracted from documents after filtering.
 
-    This function modifies the query_state object by setting various attributes based on the metadata of documents 
-    in the post_filtered_docs list. It processes documents to categorize them by their data source 
+    This function modifies the query_state object by setting various attributes based on the metadata of documents
+    in the post_filtered_docs list. It processes documents to categorize them by their data source
     (B360, KM or MP from KC), and updates the query_state with URLs, and categorized attributes for each type.
 
     Args:
         query_state (QueryState): The query state object that needs to be updated with document attributes.
-        post_filtered_docs (list[Document]): A list of Document objects that have been filtered and whose attributes 
+        post_filtered_docs (list[Document]): A list of Document objects that have been filtered and whose attributes
         are to be extracted.
 
     Returns:
