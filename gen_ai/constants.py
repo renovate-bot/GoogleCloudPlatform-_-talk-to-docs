@@ -10,7 +10,7 @@ LLM_YAML_FILE = "gen_ai/llm.yaml"
 PROCESSED_FILES_DIR = "/mnt/resources/uhg/main_folder"
 
 LOGS_DIRECTORY = "gen_ai/logs"
-VECTOR_STORE = "gen_ai/vector_store_approach_2"
+VECTOR_STORE = "gen_ai/vector_store"
 
 MAX_OUTPUT_TOKENS = 4000
 MAX_CONTEXT_SIZE = 1025000
