@@ -16,7 +16,7 @@ use_full_documents: true
 use_relevancy_score: false
 use_mmr: false
 bq_project_id: chertushkin-genai-sa
-dataset_name: uhg2
+dataset_name: uhg
 terraform_credentials: /home/chertushkin/terraform-service-account-credentials.json
 terraform_instance_name: talk-to-docs-instance
 terraform_redis_name: talk-to-docs-redis-instance
