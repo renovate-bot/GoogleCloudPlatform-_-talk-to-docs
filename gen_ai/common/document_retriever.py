@@ -20,6 +20,7 @@ from langchain_core.documents.base import Document
 import gen_ai.common.common as common
 from gen_ai.common.argo_logger import trace_on
 from gen_ai.common.chroma_utils import convert_to_chroma_format
+from gen_ai.common.ioc_container import Container
 
 
 def remove_member_id(metadata: dict[str, Any]) -> dict[str, Any]:
@@ -112,11 +113,14 @@ class SemanticDocumentRetriever(DocumentRetriever):
             metadata = convert_to_chroma_format(metadata)
 
         ss_docs = store.similarity_search_with_score(query=questions_for_search, k=50, filter=metadata)
-        ss_docs = [x[0] for x in ss_docs[0:3]]
+        ss_docs = [x[0] for x in ss_docs[0:2]]
 
-        mmr_docs = store.max_marginal_relevance_search(
-            query=questions_for_search, k=1, lambda_mult=0.5, filter=metadata
-        )
+        if Container.config.get("use_mmr", False):
+            mmr_docs = store.max_marginal_relevance_search(
+                query=questions_for_search, k=1, lambda_mult=0.5, filter=metadata
+            )
+        else:
+            mmr_docs = []
         docs = common.remove_duplicates(ss_docs + mmr_docs)
 
         return docs
