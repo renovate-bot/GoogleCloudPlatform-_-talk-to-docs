@@ -47,14 +47,14 @@ jobs:
     - name: Create directory structure in writable area
       run: mkdir -p $HOME/resources/uhg/main_folder
 
-    - name: Create symlink
-      run: |
-        sudo ln -s $HOME/resources /mnt/resources
-        echo "Directory structure created and symlinked"
+    # - name: Create symlink
+    #   run: |
+    #     sudo ln -s $HOME/resources /mnt/resources
+    #     echo "Directory structure created and symlinked"
 
     - name: Test with pytest
       run: |
-        echo "Run the tests later"
-        # gsutil ls gs://public_ci_cd_bucket
-        # python gen_ai/copy_resources.py gs://public_ci_cd_bucket
-        # pytest gen_ai/tests
+        # echo "Run the tests later"
+        gsutil ls gs://public_ci_cd_bucket
+        python gen_ai/copy_resources.py gs://public_ci_cd_bucket
+        pytest gen_ai/tests
