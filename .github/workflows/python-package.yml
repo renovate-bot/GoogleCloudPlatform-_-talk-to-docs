@@ -22,11 +22,11 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
 
-    # - name: Authenticate with Google Cloud
-    #   uses: 'google-github-actions/auth@v2'
-    #   with:
-    #     project_id: 'chertushkin-genai-sa'
-    #     workload_identity_provider: '${{ secrets.WORKLOAD_IDENTITY_POOL }}'
+    - name: Authenticate with Google Cloud
+      uses: 'google-github-actions/auth@v2'
+      with:
+        project_id: 'chertushkin-genai-sa'
+        workload_identity_provider: '${{ secrets.WORKLOAD_IDENTITY_POOL }}'
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
