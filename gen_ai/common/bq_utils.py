@@ -33,8 +33,9 @@ from google.api_core.exceptions import GoogleAPIError, NotFound
 from google.cloud import bigquery
 from google.cloud.bigquery.schema import SchemaField
 
+from gen_ai.common.document_utils import convert_dict_to_summaries
 from gen_ai.common.ioc_container import Container
-from gen_ai.common.memorystore_utils import convert_dict_to_relevancies, convert_dict_to_summaries
+from gen_ai.common.document_utils import convert_dict_to_relevancies
 from gen_ai.deploy.model import QueryState
 from gen_ai.constants import MAX_OUTPUT_TOKENS
 

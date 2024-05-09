@@ -11,10 +11,11 @@ container for Redis connections and custom data types like `PersonalizedData` an
 import json
 from dataclasses import asdict
 from datetime import datetime
-from typing import Any, List
+from typing import List
 
 from langchain.schema import Document
 
+from gen_ai.common.document_utils import convert_json_to_langchain, generate_contexts_from_docs
 from gen_ai.common.ioc_container import Container
 from gen_ai.deploy.model import PersonalizedData, QueryState
 
@@ -37,79 +38,6 @@ def generate_query_state_key(personalized_data: dict[str, str], unique_identifie
     if unique_identifier:
         the_key = f"{the_key}:{unique_identifier}"
     return the_key
-
-
-def convert_langchain_to_json(doc: Document) -> dict[str, Any]:
-    """
-    Converts a `Document` object to a JSON-serializable dictionary.
-
-    This function is specifically designed for converting documents from the custom `Document`
-    format used within the langchain schema to a JSON format for storage or further processing.
-
-    Args:
-        doc (Document): The `Document` object to convert.
-
-    Returns:
-        dict: A dictionary representation of the `Document`, suitable for JSON serialization.
-    """
-    doc_json = {}
-    doc_json["page_content"] = doc.page_content
-    doc_json["metadata"] = doc.metadata
-    return doc_json
-
-
-def convert_dict_to_summaries(doc: dict) -> dict[str, Any]:
-    """
-    Converts a `Document` object to a JSON-serializable dictionary.
-
-    This function is specifically designed for converting documents from the custom `Document`
-    format used within the langchain schema to a JSON format for storage or further processing.
-
-    Args:
-        doc (Document): The `Document` object to convert.
-
-    Returns:
-        dict: A dictionary representation of the `Document`, suitable for JSON serialization.
-    """
-    doc_json = {}
-    doc_json["summary"] = doc["metadata"]["summary"]
-    doc_json["summary_reasoning"] = doc["metadata"]["summary_reasoning"]
-    return doc_json
-
-
-def convert_dict_to_relevancies(doc: dict) -> dict[str, Any]:
-    """
-    Converts a `Document` object to a JSON-serializable dictionary.
-
-    This function is specifically designed for converting documents from the custom `Document`
-    format used within the langchain schema to a JSON format for storage or further processing.
-
-    Args:
-        doc (Document): The `Document` object to convert.
-
-    Returns:
-        dict: A dictionary representation of the `Document`, suitable for JSON serialization.
-    """
-    doc_json = {}
-    doc_json["relevancy_score"] = doc["metadata"]["relevancy_score"]
-    doc_json["relevancy_reasoning"] = doc["metadata"]["relevancy_reasoning"]
-    return doc_json
-
-
-def convert_json_to_langchain(doc: dict[str, Any]) -> Document:
-    """
-    Converts a JSON-serializable dictionary to a `Document` object.
-
-    This function allows for the reverse operation of `convert_langchain_to_json`, enabling
-    the reconstruction of a `Document` object from its JSON dictionary representation.
-
-    Args:
-        doc (dict): The dictionary representation of a `Document`.
-
-    Returns:
-        Document: The reconstructed `Document` object.
-    """
-    return Document(page_content=doc["page_content"], metadata=doc["metadata"])
 
 
 def save_query_state_to_redis(query_state: QueryState, personalized_data: dict[str, str]) -> None:
@@ -248,8 +176,10 @@ def serialize_previous_conversation(query_states: list[QueryState]) -> str:
         Previous additional information to retrieve #1: Population details
     """
     serialized_previous_conversation = []
+
     for i, query_state in enumerate(query_states):
-        context = generate_one_context_from_docs(query_state.post_filtered_docs)
+        context = generate_contexts_from_docs(query_state.post_filtered_docs, None)
+        print('CONTEXT', context)
         response = f"""
         Previous context #{i} was: {context}
         Previous question #{i} was: {query_state.question}

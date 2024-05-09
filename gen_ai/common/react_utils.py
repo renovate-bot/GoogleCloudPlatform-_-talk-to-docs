@@ -42,7 +42,7 @@ import json5
 from langchain.chains import LLMChain
 from langchain.schema import Document
 
-from gen_ai.common.argo_logger import trace_on
+from gen_ai.common.measure_utils import trace_on
 from gen_ai.common.ioc_container import Container
 from gen_ai.deploy.model import QueryState
 from gen_ai.constants import RETRIEVER_SCORE_THRESHOLD, PREVIOUS_CONVERSATION_SCORE_THRESHOLD
