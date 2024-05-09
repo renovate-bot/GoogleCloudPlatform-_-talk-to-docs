@@ -48,6 +48,6 @@ jobs:
         echo "Directory structure created and symlinked"
     - name: Test with pytest
       run: |
-        echo "Run the tests later"
-        # python gen_ai/copy_resources.py gs://public_ci_cd_bucket
-        # pytest gen_ai/tests
+        # echo "Run the tests later"
+        python gen_ai/copy_resources.py gs://public_ci_cd_bucket
+        pytest gen_ai/tests
