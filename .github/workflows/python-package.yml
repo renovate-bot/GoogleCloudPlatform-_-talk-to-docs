@@ -47,6 +47,7 @@ jobs:
       run: |
         sudo ln -s $HOME/resources /mnt/resources
         echo "Directory structure created and symlinked"
+    - run: gcloud auth revoke --all
     - name: Test with pytest
       run: |
         # echo "Run the tests later"

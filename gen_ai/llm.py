@@ -362,6 +362,8 @@ def respond(conversation: Conversation, member_info: dict) -> Conversation:
         Exception: If issues arise in conversation processing or during response generation.
     """
     conversation.member_info = member_info
+    if conversation.member_info and "set_number" in conversation.member_info:
+        conversation.member_info["set_number"] = conversation.member_info["set_number"].lower()
 
     api_mode = Container.config.get("api_mode", "stateless")
     statefullness_enabled = api_mode == "stateful"
