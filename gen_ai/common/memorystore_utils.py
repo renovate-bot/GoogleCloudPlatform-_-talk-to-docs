@@ -63,6 +63,7 @@ def save_query_state_to_redis(query_state: QueryState, personalized_data: dict[s
 
     Container.redis_db().set(key, query_state_json)
 
+
 def build_doc_title(metadata: dict[str, str]) -> str:
     """Constructs a document title string based on provided metadata.
 
@@ -109,7 +110,6 @@ def generate_one_context_from_docs(docs_and_scores: list[Document]) -> str:
 
     contexts[-1] += "\n"
     return contexts[0]
-
 
 
 def get_query_states_from_memorystore(personalized_info: PersonalizedData) -> List[QueryState]:
@@ -179,7 +179,7 @@ def serialize_previous_conversation(query_states: list[QueryState]) -> str:
 
     for i, query_state in enumerate(query_states):
         context = generate_contexts_from_docs(query_state.post_filtered_docs, None)
-        print('CONTEXT', context)
+        print("CONTEXT", context)
         response = f"""
         Previous context #{i} was: {context}
         Previous question #{i} was: {query_state.question}

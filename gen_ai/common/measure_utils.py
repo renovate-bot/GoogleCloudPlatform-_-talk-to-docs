@@ -1,3 +1,5 @@
+"""This module provides functions for measuring execution time and logging system metrics."""
+
 from gen_ai.common.ioc_container import Container
 
 

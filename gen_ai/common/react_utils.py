@@ -333,12 +333,10 @@ def score_previous_conversation(
             json_output = json_output.replace("```json", "").replace("```", "")
             output = json5.loads(json_output)
         relevancy_score = int(output["relevancy_score"])
-        relevancy_reasoning = output["relevancy_reasoning"]
     except Exception as e:  # pylint: disable=W0718
         print("Error in parsing the document for relevancy score")
         print(str(e))
         relevancy_score = 0
-        relevancy_reasoning = "Failed to assign relevant score"
 
     return index, query_state, relevancy_score
 

@@ -1,3 +1,6 @@
+"""This module provides functions for converting documents to Langchain and dictionaries, as well as
+generation of contexts from the list of docs"""
+
 from dependency_injector.wiring import inject
 from langchain.schema import Document
 
@@ -192,7 +195,7 @@ def generate_contexts_from_docs(docs_and_scores: list[Document], query_state: Qu
     contexts[-1] += "\n"
 
     Container.logger().info(msg=f"Docs used: {num_docs_used}, tokens used: {token_counts}")
-    
+
     if query_state:
         query_state.input_tokens = token_counts
         query_state.num_docs_used = num_docs_used
