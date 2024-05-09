@@ -61,7 +61,8 @@ def copy_from_gcs(gcs_bucket: str, destination_folder: str):
 
 @click.command()
 @click.argument("gcs_source_bucket", required=False)
-def copy_resources(gcs_source_bucket: str | None = None):
+@click.option("--use-home", is_flag=True, help="Use the home directory ($HOME/resources) as the base directory instead of /mnt/resources.")
+def copy_resources(gcs_source_bucket: str | None = None, use_home: bool = False):
     """Copies resources from a Google Cloud Storage (GCS) bucket to a local directory.
 
     This function performs the following steps:
@@ -77,12 +78,11 @@ def copy_resources(gcs_source_bucket: str | None = None):
     """
 
     config = common.load_yaml(LLM_YAML_FILE)
-    base_lexem = PROCESSED_FILES_DIR.split("/")[1]
-    if base_lexem == "mnt":
-        base_path = "/mnt/resources"
-    else:
+    if use_home:
         home_path = os.getenv("HOME")
         base_path = f"{home_path}/resources"
+    else:
+        base_path = "/mnt/resources"
     gcs_bucket = gcs_source_bucket or config["gcs_source_bucket"]
     dataset_name = config["dataset_name"]
 
