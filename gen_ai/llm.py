@@ -128,9 +128,9 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
     round_number = len(query_state.react_rounds) + 1
     if len(conversation.exchanges) > 1 and config.get("api_mode") == "stateful":
         number_of_previous_conversations = config.get("previous_conversations_number")
-        previous_conversations = conversation.exchanges[1:][:number_of_previous_conversations]
+        previous_conversations = conversation.exchanges[:-1][:number_of_previous_conversations]
         relevant_previous_conversations = filter_non_relevant_previous_conversations(previous_conversations, question)
-        previous_context = serialize_previous_conversation(relevant_previous_conversations[::-1])
+        previous_context = serialize_previous_conversation(relevant_previous_conversations)
     else:
         previous_context = ""
 
@@ -206,7 +206,6 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
                         attempts -= 1
             if (
                 "answer" not in output
-                or "context_used" not in output
                 or (len(post_filtered_docs) == 0 and not output.get("additional_information_to_retrieve", None))
             ):
                 output["answer"] = "I was not able to answer this question"

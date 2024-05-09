@@ -128,8 +128,7 @@ def serialize_previous_conversation(query_states: list[QueryState]) -> str:
     serialized_previous_conversation = []
 
     for i, query_state in enumerate(query_states):
-        context = generate_contexts_from_docs(query_state.post_filtered_docs, None)
-        print("CONTEXT", context)
+        context = generate_contexts_from_docs(query_state.post_filtered_docs, None)[0]
         response = f"""
         Previous context #{i} was: {context}
         Previous question #{i} was: {query_state.question}
