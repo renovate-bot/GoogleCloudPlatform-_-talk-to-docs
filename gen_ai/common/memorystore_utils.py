@@ -64,54 +64,6 @@ def save_query_state_to_redis(query_state: QueryState, personalized_data: dict[s
     Container.redis_db().set(key, query_state_json)
 
 
-def build_doc_title(metadata: dict[str, str]) -> str:
-    """Constructs a document title string based on provided metadata.
-
-    This function takes a dictionary containing various metadata fields,
-    including "set_number," "section_name," "doc_identifier," and "policy_number."
-    It concatenates these values to form a document title string.
-
-    Args:
-        metadata (dict[str, str]): A dictionary with potential metadata fields.
-            - "set_number": An identifier representing the set number.
-            - "section_name": The name of the relevant section.
-            - "doc_identifier": A unique identifier for the document.
-            - "policy_number": The specific number of the associated policy.
-
-    Returns:
-        str: A concatenated string containing the document title information
-        based on the provided metadata fields.
-
-    """
-    doc_title = ""
-    if metadata["set_number"]:
-        doc_title += metadata["set_number"] + " "
-    if metadata["section_name"]:
-        doc_title += metadata["section_name"] + " "
-    if metadata["doc_identifier"]:
-        doc_title += metadata["doc_identifier"] + " "
-    if metadata["policy_number"]:
-        doc_title += metadata["policy_number"] + " "
-    return doc_title
-
-
-def generate_one_context_from_docs(docs_and_scores: list[Document]) -> str:
-    contexts = ["\n"]
-    for doc in docs_and_scores:
-        doc_content = doc.page_content if Container.config.get("use_full_documents", False) else doc.metadata["summary"]
-        doc_chunks = [doc_content]
-
-        for doc_chunk in doc_chunks:
-            contexts[-1] += "DOCUMENT TITLE: "
-            contexts[-1] += build_doc_title(doc.metadata) + "\n"
-            contexts[-1] += "DOCUMENT CONTENT: "
-            contexts[-1] += doc_chunk
-            contexts[-1] += "\n" + "-" * 12 + "\n"
-
-    contexts[-1] += "\n"
-    return contexts[0]
-
-
 def get_query_states_from_memorystore(personalized_info: PersonalizedData) -> List[QueryState]:
     """
     Retrieves a list of `QueryState` objects from Redis based on personalized info.
