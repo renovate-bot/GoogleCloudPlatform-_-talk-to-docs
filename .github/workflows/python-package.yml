@@ -54,5 +54,6 @@ jobs:
 
     - name: Test with pytest
       run: |
+        gsutil ls gs://public_ci_cd_bucket
         python gen_ai/copy_resources.py gs://public_ci_cd_bucket
         pytest gen_ai/tests
