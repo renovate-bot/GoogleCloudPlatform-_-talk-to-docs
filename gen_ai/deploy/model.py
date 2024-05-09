@@ -163,6 +163,7 @@ class QueryState:
         attributes_to_kc_km: List of dictionaries, that represents information from KC, type KM. See LLMOutput
         attributes_to_kc_mp: List of dictionaries, that represents information from KC, type MP. See LLMOutput
         attributes_to_b360: List of dictionaries, that represents information from B360. See LLMOutput
+        post_filtered_docs: List of documents that were used to generate answer
     """
 
     question: str
@@ -182,6 +183,7 @@ class QueryState:
     attributes_to_kc_km: list[dict[str, str, str]] = field(default_factory=list)
     attributes_to_kc_mp: list[dict[str, str, str]] = field(default_factory=list)
     attributes_to_b360: list[dict[str, str]] = field(default_factory=list)
+    post_filtered_docs: list = field(default_factory=list)
 
 
 @dataclass

@@ -250,7 +250,7 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
     round_number = len(query_state.react_rounds) + 1
     if len(conversation.exchanges) > 1 and config.get("api_mode") == "stateful":
         number_of_previous_conversations = config.get("previous_conversations_number")
-        previous_conversations = conversation.exchanges[:-1][-(number_of_previous_conversations):]
+        previous_conversations = conversation.exchanges[1:][:number_of_previous_conversations]
         relevant_previous_conversations = filter_non_relevant_previous_conversations(previous_conversations, question)
         previous_context = serialize_previous_conversation(relevant_previous_conversations[::-1])
     else:
@@ -397,6 +397,7 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
     query_state.all_sections_needed = [x[0] for x in query_state.used_articles_with_scores]
     query_state.used_articles_with_scores = None
     query_state.confidence_score = confidence
+    query_state.post_filtered_docs = log_snapshots[-1]['post_filtered_docs']
     query_state = fill_query_state_with_doc_attributes(query_state, post_filtered_docs)
 
     return conversation, log_snapshots

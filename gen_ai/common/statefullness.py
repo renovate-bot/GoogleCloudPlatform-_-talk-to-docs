@@ -90,7 +90,7 @@ class RequestEnricher:
             The enriched Conversation object.
         """
         for previous_conversation in self.previous_conversations:
-            self.conversation.exchanges.insert(0, previous_conversation)
+            self.conversation.exchanges.append(previous_conversation)
             Container.logger().info(msg="Enriching Request with question and answer")
             Container.logger().info(msg=f"Question: {previous_conversation.question}")
             Container.logger().info(msg=f"Answer: {previous_conversation.answer}")

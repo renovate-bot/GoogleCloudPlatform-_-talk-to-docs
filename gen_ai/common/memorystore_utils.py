@@ -19,15 +19,15 @@ from gen_ai.common.ioc_container import Container
 from gen_ai.deploy.model import PersonalizedData, QueryState
 
 
-def generate_query_state_key(personalized_data: PersonalizedData, unique_identifier: str | None = None) -> str:
+def generate_query_state_key(personalized_data: dict[str, str], unique_identifier: str | None = None) -> str:
     """
     Generates a unique key for storing a query state in Redis.
 
-    The key is constructed using the policy number and set number from the personalized data, along with a
+    The key is constructed using the member id number and set number from the personalized data, along with a
     unique identifier.
 
     Args:
-        personalized_data (PersonalizedData): The personalized data containing the policy and set number.
+        personalized_data (dict[str, str]): The personalized data containing the policy and set number.
         unique_identifier (str): A unique identifier for the query state, typically a timestamp.
 
     Returns:
@@ -112,7 +112,7 @@ def convert_json_to_langchain(doc: dict[str, Any]) -> Document:
     return Document(page_content=doc["page_content"], metadata=doc["metadata"])
 
 
-def save_query_state_to_redis(query_state: QueryState, personalized_data: PersonalizedData) -> None:
+def save_query_state_to_redis(query_state: QueryState, personalized_data: dict[str, str]) -> None:
     """
     Saves a query state to Redis using a generated key.
 
@@ -122,7 +122,7 @@ def save_query_state_to_redis(query_state: QueryState, personalized_data: Person
 
     Args:
         query_state (QueryState): The query state to save.
-        personalized_data (PersonalizedData): The personalized data used to generate part of the key.
+        personalized_data (dict[str, str]): The personalized data used to generate part of the key.
 
     Side Effects:
         Saves a serialized version of the query state to Redis under a generated key.
@@ -134,6 +134,54 @@ def save_query_state_to_redis(query_state: QueryState, personalized_data: Person
     key = generate_query_state_key(personalized_data, unique_identifier)
 
     Container.redis_db().set(key, query_state_json)
+
+def build_doc_title(metadata: dict[str, str]) -> str:
+    """Constructs a document title string based on provided metadata.
+
+    This function takes a dictionary containing various metadata fields,
+    including "set_number," "section_name," "doc_identifier," and "policy_number."
+    It concatenates these values to form a document title string.
+
+    Args:
+        metadata (dict[str, str]): A dictionary with potential metadata fields.
+            - "set_number": An identifier representing the set number.
+            - "section_name": The name of the relevant section.
+            - "doc_identifier": A unique identifier for the document.
+            - "policy_number": The specific number of the associated policy.
+
+    Returns:
+        str: A concatenated string containing the document title information
+        based on the provided metadata fields.
+
+    """
+    doc_title = ""
+    if metadata["set_number"]:
+        doc_title += metadata["set_number"] + " "
+    if metadata["section_name"]:
+        doc_title += metadata["section_name"] + " "
+    if metadata["doc_identifier"]:
+        doc_title += metadata["doc_identifier"] + " "
+    if metadata["policy_number"]:
+        doc_title += metadata["policy_number"] + " "
+    return doc_title
+
+
+def generate_one_context_from_docs(docs_and_scores: list[Document]) -> str:
+    contexts = ["\n"]
+    for doc in docs_and_scores:
+        doc_content = doc.page_content if Container.config.get("use_full_documents", False) else doc.metadata["summary"]
+        doc_chunks = [doc_content]
+
+        for doc_chunk in doc_chunks:
+            contexts[-1] += "DOCUMENT TITLE: "
+            contexts[-1] += build_doc_title(doc.metadata) + "\n"
+            contexts[-1] += "DOCUMENT CONTENT: "
+            contexts[-1] += doc_chunk
+            contexts[-1] += "\n" + "-" * 12 + "\n"
+
+    contexts[-1] += "\n"
+    return contexts[0]
+
 
 
 def get_query_states_from_memorystore(personalized_info: PersonalizedData) -> List[QueryState]:
@@ -160,9 +208,18 @@ def get_query_states_from_memorystore(personalized_info: PersonalizedData) -> Li
             query_state_dict = json.loads(query_state_json)
 
             query_state_obj = QueryState(**query_state_dict)
-            matching_query_states.append(query_state_obj)
+            timestamp = key.split(":")[-1]
 
-    return matching_query_states
+            # we have to convert it back to Doc format
+            query_state_obj.post_filtered_docs = [
+                convert_json_to_langchain(x) for x in query_state_obj.post_filtered_docs
+            ]
+            matching_query_states.append((timestamp, query_state_obj))
+
+    matching_query_states.sort(key=lambda x: x[0], reverse=True)
+    sorted_query_states = [qs[1] for qs in matching_query_states]
+
+    return sorted_query_states
 
 
 def serialize_previous_conversation(query_states: list[QueryState]) -> str:
@@ -192,7 +249,9 @@ def serialize_previous_conversation(query_states: list[QueryState]) -> str:
     """
     serialized_previous_conversation = []
     for i, query_state in enumerate(query_states):
+        context = generate_one_context_from_docs(query_state.post_filtered_docs)
         response = f"""
+        Previous context #{i} was: {context}
         Previous question #{i} was: {query_state.question}
         Previous answer #{i} was: {query_state.answer} 
         Previous additional information to retrieve #{i} was: {query_state.additional_information_to_retrieve}"""

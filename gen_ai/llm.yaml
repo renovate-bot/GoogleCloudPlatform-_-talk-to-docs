@@ -262,7 +262,8 @@ simple_react_chain_prompt: |
   You will be given context, which contains documents. You will need to answer the question based on the context.
   <Instructions>
     - The context will come as documents, separated with DOCUMENT TITLE and DOCUMENT CONTENT
-    - Include only relevant paragraphs of texts into "context_used". Separate the relevant paragraphs of text the same way as they were given in the context with DOCUMENT TITLE and DOCUMENT CONTENT
+    - The context may contain previous questions, previous answers and previous contexts. In this case it will be flagged as 'Previous context was', etc.
+    - If the context contains Previous context, try to answer the question, incorporating details from previous documents, answers, questions.
     - Include follow-up question into "additional_information_to_retrieve"
     - Write the plan of answer and reasoning into "plan_and_summaries"
   </Instructions>
@@ -274,7 +275,7 @@ simple_react_chain_prompt: |
     "plan_and_summaries": "Here provide plan of answer and reasoning about it",
     "answer": "Here provide the answer to the question",
     "additional_information_to_retrieve": "Here provide follow-up question",
-    "context_used": "Here provide the relevant paragraphs of text"
+    "context_used": "dont fill anything here"
   }}
 
 react_chain_prompt: |
