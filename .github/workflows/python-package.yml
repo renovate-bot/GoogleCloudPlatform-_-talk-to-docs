@@ -49,7 +49,6 @@ jobs:
     - name: Test with pytest
       run: |
         # echo "Run the tests later"
-        gcloud auth login
         gcloud auth application-default login
         python gen_ai/copy_resources.py gs://public_ci_cd_bucket
         pytest gen_ai/tests
