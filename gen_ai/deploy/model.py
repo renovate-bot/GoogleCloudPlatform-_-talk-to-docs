@@ -183,7 +183,6 @@ class QueryState:
     attributes_to_kc_km: list[dict[str, str, str]] = field(default_factory=list)
     attributes_to_kc_mp: list[dict[str, str, str]] = field(default_factory=list)
     attributes_to_b360: list[dict[str, str]] = field(default_factory=list)
-    post_filtered_docs: list = field(default_factory=list)
 
 
 @dataclass

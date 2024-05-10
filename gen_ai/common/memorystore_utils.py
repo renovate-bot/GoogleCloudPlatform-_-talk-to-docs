@@ -87,11 +87,6 @@ def get_query_states_from_memorystore(personalized_info: PersonalizedData) -> Li
 
             query_state_obj = QueryState(**query_state_dict)
             timestamp = key.split(":")[-1]
-
-            # we have to convert it back to Doc format
-            query_state_obj.post_filtered_docs = [
-                convert_json_to_langchain(x) for x in query_state_obj.post_filtered_docs
-            ]
             matching_query_states.append((timestamp, query_state_obj))
 
     matching_query_states.sort(key=lambda x: x[0], reverse=True)
@@ -128,9 +123,7 @@ def serialize_previous_conversation(query_states: list[QueryState]) -> str:
     serialized_previous_conversation = []
 
     for i, query_state in enumerate(query_states):
-        context = generate_contexts_from_docs(query_state.post_filtered_docs, None)[0]
         response = f"""
-        Previous context #{i} was: {context}
         Previous question #{i} was: {query_state.question}
         Previous answer #{i} was: {query_state.answer} 
         Previous additional information to retrieve #{i} was: {query_state.additional_information_to_retrieve}"""

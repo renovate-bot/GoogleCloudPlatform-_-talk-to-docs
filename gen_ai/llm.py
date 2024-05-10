@@ -131,12 +131,26 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
         previous_conversations = conversation.exchanges[:-1][:number_of_previous_conversations]
         relevant_previous_conversations = filter_non_relevant_previous_conversations(previous_conversations, question)
         previous_context = serialize_previous_conversation(relevant_previous_conversations[::-1])
+        previous_questions = [x.question for x in relevant_previous_conversations]
     else:
         previous_context = ""
+        previous_questions = None
+        prev_pre_filtered_docs, prev_post_filtered_docs = [], []
 
     pre_filtered_docs, post_filtered_docs = retrieve_initial_documents(
         round_number, question, vector_indices, document_retriever_name, member_info
     )
+
+    if previous_questions:
+        concatenated_with_previous = previous_questions + [question]
+        prev_pre_filtered_docs, prev_post_filtered_docs = perform_retrieve_round(
+            -1, concatenated_with_previous, vector_indices, document_retriever_name, member_info
+        )
+        pre_filtered_docs = prev_pre_filtered_docs + pre_filtered_docs
+        pre_filtered_docs = remove_duplicates(pre_filtered_docs)
+        post_filtered_docs = prev_post_filtered_docs + post_filtered_docs
+        post_filtered_docs = remove_duplicates(post_filtered_docs)
+
     contexts = generate_contexts_from_docs(post_filtered_docs, query_state)
 
     final_round_statement = ""
@@ -275,7 +289,6 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
     query_state.all_sections_needed = [x[0] for x in query_state.used_articles_with_scores]
     query_state.used_articles_with_scores = None
     query_state.confidence_score = confidence
-    query_state.post_filtered_docs = log_snapshots[-1]["post_filtered_docs"]
     query_state = fill_query_state_with_doc_attributes(query_state, post_filtered_docs)
 
     return conversation, log_snapshots
