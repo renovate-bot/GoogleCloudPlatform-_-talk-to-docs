@@ -130,7 +130,7 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
         number_of_previous_conversations = config.get("previous_conversations_number")
         previous_conversations = conversation.exchanges[:-1][:number_of_previous_conversations]
         relevant_previous_conversations = filter_non_relevant_previous_conversations(previous_conversations, question)
-        previous_context = serialize_previous_conversation(relevant_previous_conversations)
+        previous_context = serialize_previous_conversation(relevant_previous_conversations[::-1])
     else:
         previous_context = ""
 
@@ -223,7 +223,10 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
         query_state.time_taken = end_time - start_time
         output, confidence, index = merge_outputs(round_outputs)
         selected_context = contexts[index]
+        
 
+        if 'context_used' not in output:
+            output['context_used'] = ""
         react_snapshot = {
             "round_number": round_number,
             "plan_and_summaries": output["plan_and_summaries"],
