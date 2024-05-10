@@ -204,9 +204,8 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
                         Container.logger().info(msg=str(e2))
                         done = False
                         attempts -= 1
-            if (
-                "answer" not in output
-                or (len(post_filtered_docs) == 0 and not output.get("additional_information_to_retrieve", None))
+            if "answer" not in output or (
+                len(post_filtered_docs) == 0 and not output.get("additional_information_to_retrieve", None)
             ):
                 output["answer"] = "I was not able to answer this question"
                 output["plan_and_summaries"] = ""
@@ -223,10 +222,9 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
         query_state.time_taken = end_time - start_time
         output, confidence, index = merge_outputs(round_outputs)
         selected_context = contexts[index]
-        
 
-        if 'context_used' not in output:
-            output['context_used'] = ""
+        if "context_used" not in output:
+            output["context_used"] = ""
         react_snapshot = {
             "round_number": round_number,
             "plan_and_summaries": output["plan_and_summaries"],
