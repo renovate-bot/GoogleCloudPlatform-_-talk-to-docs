@@ -13,7 +13,6 @@ from dataclasses import asdict
 from datetime import datetime
 from typing import List
 
-from gen_ai.common.document_utils import convert_json_to_langchain, generate_contexts_from_docs
 from gen_ai.common.ioc_container import Container
 from gen_ai.deploy.model import PersonalizedData, QueryState
 
