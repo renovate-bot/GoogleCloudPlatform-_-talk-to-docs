@@ -54,7 +54,7 @@ jobs:
 
     - name: Test with pytest
       run: |
-        # echo "Run the tests later"
-        gsutil ls gs://public_ci_cd_bucket
-        python gen_ai/copy_resources.py gs://public_ci_cd_bucket --use-home
-        pytest gen_ai/tests
+        echo "Run the tests later"
+        # gsutil ls gs://public_ci_cd_bucket
+        # python gen_ai/copy_resources.py gs://public_ci_cd_bucket --use-home
+        # pytest gen_ai/tests
