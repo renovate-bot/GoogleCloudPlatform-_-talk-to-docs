@@ -108,7 +108,6 @@ def run_pipeline(mode: Literal["batch", "step"] = "step", csv_path: str = None, 
         Measures and displays execution time in 'step' mode.
     """
     session_id = str(uuid.uuid4())
-    Container.session_id = session_id
     Container.logger().info(msg=f"Session id is: {session_id}")
     Container.comments = comments
     if mode == "batch":
@@ -121,15 +120,17 @@ def run_pipeline(mode: Literal["batch", "step"] = "step", csv_path: str = None, 
 
             if Container.config.get("personalization"):
                 personalized_data = get_default_personalized_info(row)
+                personalized_data["session_id"] = session_id
             answer = run_single_prediction(question, personalized_data)
             Container.logger().info(msg=f"Answer: {answer}")
     elif mode == "step":
         start = default_timer()
-        for idx, input_query in enumerate(["How does reimbursement work?"]):
+        for idx, input_query in enumerate(["I am traveling to Europe on vacation. Do I have coverage if I need to seek medical treatment?"]):
             Container.logger().info(msg=f"Asking question {idx} in document ")
             Container.logger().info(msg=f"Question: {input_query}")
             answer = run_single_prediction(
-                input_query, {"set_number": "001acis", "member_id": "xyz123456789111101011012"}
+                input_query,
+                {"set_number": "001acis", "member_id": "q123", "session_id": session_id},
             )
             Container.logger().info(msg=f"Answer: {answer}")
         end = default_timer()

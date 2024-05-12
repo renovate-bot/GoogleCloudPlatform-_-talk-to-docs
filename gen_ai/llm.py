@@ -377,6 +377,8 @@ def respond(conversation: Conversation, member_info: dict) -> Conversation:
     conversation.member_info = member_info
     if conversation.member_info and "set_number" in conversation.member_info:
         conversation.member_info["set_number"] = conversation.member_info["set_number"].lower()
+    if conversation.member_info and "session_id" in conversation.member_info:
+        conversation.session_id = conversation.member_info["session_id"]
 
     api_mode = Container.config.get("api_mode", "stateless")
     statefullness_enabled = api_mode == "stateful"
@@ -391,14 +393,14 @@ def respond(conversation: Conversation, member_info: dict) -> Conversation:
     if statefullness_enabled:
         serialize_response(conversation)
 
-    session_id = Container.session_id if hasattr(Container, "session_id") else str(uuid.uuid4())
-    df = BigQueryConverter.convert_query_state_to_prediction(conversation.exchanges[-1], log_snapshots, session_id)
+    df = BigQueryConverter.convert_query_state_to_prediction(
+        conversation.exchanges[-1], log_snapshots, conversation.session_id
+    )
     client = create_bq_client()
     dataset_id = get_dataset_id()
     table_id = f"{dataset_id}.prediction"
     load_data_to_bq(client, table_id, schema_prediction, df)
 
-    conversation.session_id = session_id
     return conversation
 
 

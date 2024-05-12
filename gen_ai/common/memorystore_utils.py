@@ -16,6 +16,8 @@ from typing import List
 from gen_ai.common.ioc_container import Container
 from gen_ai.deploy.model import PersonalizedData, QueryState
 
+DEFAULT_SESSION_ID = "123456789"
+
 
 def generate_query_state_key(personalized_data: dict[str, str], unique_identifier: str | None = None) -> str:
     """
@@ -32,6 +34,10 @@ def generate_query_state_key(personalized_data: dict[str, str], unique_identifie
         str: A string key uniquely identifying a query state for storage in Redis.
     """
     the_key = f"query_state:{personalized_data['member_id']}:{personalized_data['set_number']}"
+    if "session_id" in personalized_data and personalized_data["session_id"]:
+        the_key = f"{the_key}:{personalized_data['session_id']}"
+    else:
+        the_key = f"{the_key}:{DEFAULT_SESSION_ID}"
     if unique_identifier:
         the_key = f"{the_key}:{unique_identifier}"
     return the_key
