@@ -125,12 +125,12 @@ def run_pipeline(mode: Literal["batch", "step"] = "step", csv_path: str = None, 
             Container.logger().info(msg=f"Answer: {answer}")
     elif mode == "step":
         start = default_timer()
-        for idx, input_query in enumerate(["I am traveling to Europe on vacation. Do I have coverage if I need to seek medical treatment?"]):
+        for idx, input_query in enumerate(["How does reimbursement work?"]):
             Container.logger().info(msg=f"Asking question {idx} in document ")
             Container.logger().info(msg=f"Question: {input_query}")
             answer = run_single_prediction(
                 input_query,
-                {"set_number": "001acis", "member_id": "q123", "session_id": session_id},
+                {"set_number": "001acis", "member_id": "q123", "session_id": "123"},
             )
             Container.logger().info(msg=f"Answer: {answer}")
         end = default_timer()
