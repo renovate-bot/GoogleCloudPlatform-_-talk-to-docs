@@ -221,6 +221,14 @@ simple_react_chain_prompt: |
     - Write empty string in "context_used"
     - Include follow-up question into "additional_information_to_retrieve"
     - Write the plan of answer and reasoning into "plan_and_summaries"
+    - The output MUST BE A VALID JSON. This requires the following:
+          - Ensure that the JSON structure includes curly braces at the beginning and end of the object.
+          - Use double quotes for all keys and string values.
+          - Ensure that keys and values are separated by a colon.
+          - Separate multiple key-value pairs with commas.
+          - Avoid trailing commas after the last key-value pair.
+          - Avoid ticks "`"" and triple ticks "```"" in the response.
+          - Special characters in strings should be escaped using backslashes (e.g., use \\" for double quotes within strings).
   </Instructions>
   Here is the context: {context}
 
