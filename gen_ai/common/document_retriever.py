@@ -23,21 +23,23 @@ from gen_ai.common.chroma_utils import convert_to_chroma_format
 from gen_ai.common.ioc_container import Container
 
 
-def remove_member_id(metadata: dict[str, Any]) -> dict[str, Any]:
-    """Removes the "member_id" key from a metadata dictionary.
+def remove_member_and_session_id(metadata: dict[str, Any]) -> dict[str, Any]:
+    """Removes the "member_id" key and "session_id" from a metadata dictionary.
 
-    This function creates a copy of the input dictionary, deletes the "member_id" key from
+    This function creates a copy of the input dictionary, deletes the "member_id" and "session_id" key from
     the copy, and returns the modified copy.
 
     Args:
         metadata (dict): The input metadata dictionary.
 
     Returns:
-        dict: A new dictionary with the "member_id" key removed.
+        dict: A new dictionary with the "member_id" and "session_id" key removed.
     """
     new_metadata = copy.deepcopy(metadata)
     if "member_id" in new_metadata:
         del new_metadata["member_id"]
+    if "session_id" in new_metadata:
+        del new_metadata["session_id"]
     return new_metadata
 
 
@@ -108,7 +110,7 @@ class SemanticDocumentRetriever(DocumentRetriever):
     ) -> list[Document]:
         if metadata is None:
             metadata = {}
-        metadata = remove_member_id(metadata)
+        metadata = remove_member_and_session_id(metadata)
         if metadata is not None and len(metadata) > 1:
             metadata = convert_to_chroma_format(metadata)
 
