@@ -36,7 +36,7 @@ from langchain.chains import LLMChain
 from langchain.schema import Document
 
 from gen_ai.common.argo_logger import create_log_snapshot, trace_on
-from gen_ai.common.bq_utils import BigQueryConverter, create_bq_client, load_data_to_bq, get_dataset_id, log_question
+from gen_ai.common.bq_utils import load_data_to_bq
 from gen_ai.common.common import TokenCounter, merge_outputs, remove_duplicates, split_large_document, update_used_docs
 from gen_ai.common.ioc_container import Container
 from gen_ai.common.memorystore_utils import serialize_previous_conversation
@@ -44,7 +44,6 @@ from gen_ai.common.react_utils import get_confidence_score
 from gen_ai.common.retriever import perform_retrieve_round, retrieve_initial_documents
 from gen_ai.common.statefullness import resolve_and_enrich, serialize_response
 from gen_ai.constants import MAX_CONTEXT_SIZE
-from gen_ai.create_tables import schema_prediction
 from gen_ai.deploy.model import Conversation, PersonalizedData, QueryState, transform_to_dictionary
 
 
@@ -243,7 +242,6 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
 
     query_state = conversation.exchanges[-1]
     question = query_state.question
-    log_question(question)
 
     query_state.react_rounds = []
     log_snapshots = []
@@ -492,13 +490,10 @@ def respond(conversation: Conversation, member_info: dict) -> Conversation:
         serialize_response(conversation)
 
     session_id = Container.session_id if hasattr(Container, "session_id") else str(uuid.uuid4())
-    df = BigQueryConverter.convert_query_state_to_prediction(conversation.exchanges[-1], log_snapshots, session_id)
-    client = create_bq_client()
-    dataset_id = get_dataset_id()
-    table_id = f"{dataset_id}.prediction"
-    load_data_to_bq(client, table_id, schema_prediction, df)
-
     conversation.session_id = session_id
+
+    Container.logging_bq_executor().submit(load_data_to_bq, conversation, log_snapshots)
+
     return conversation
 
 
