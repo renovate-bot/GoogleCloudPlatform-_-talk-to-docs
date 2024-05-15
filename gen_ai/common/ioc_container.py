@@ -30,6 +30,7 @@ from concurrent.futures import ThreadPoolExecutor
 from logging import Logger
 
 import google.auth
+import google.cloud.logging
 import redis
 from dependency_injector import containers, providers
 from google.api_core.exceptions import GoogleAPIError
@@ -133,6 +134,8 @@ def provide_vector_indices(regenerate: bool = False) -> Chroma:
 
 
 def provide_logger() -> Logger:
+    client = google.cloud.logging.Client()
+    client.setup_logging()
     stdout_handler = logging.StreamHandler(stream=sys.stdout)
     logging.basicConfig(
         level=logging.INFO,
