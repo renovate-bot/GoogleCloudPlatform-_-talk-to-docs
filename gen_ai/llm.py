@@ -476,7 +476,10 @@ def respond(conversation: Conversation, member_info: dict) -> Conversation:
         Exception: If issues arise in conversation processing or during response generation.
     """
     conversation.member_info = member_info
-
+    if conversation.member_info and "session_id" in conversation.member_info:
+        conversation.session_id = conversation.member_info["session_id"]
+    else:
+        conversation.session_id = str(uuid.uuid4())
     api_mode = Container.config.get("api_mode", "stateless")
     statefullness_enabled = api_mode == "stateful"
     if statefullness_enabled:
@@ -486,9 +489,6 @@ def respond(conversation: Conversation, member_info: dict) -> Conversation:
 
     if statefullness_enabled:
         serialize_response(conversation)
-
-    session_id = Container.session_id if hasattr(Container, "session_id") else str(uuid.uuid4())
-    conversation.session_id = session_id
 
     Container.logging_bq_executor().submit(load_data_to_bq, conversation, log_snapshots)
 
