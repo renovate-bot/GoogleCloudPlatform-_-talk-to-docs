@@ -111,7 +111,11 @@ def load_data_to_bq(conversation: Conversation, log_snapshots: list[dict[str, An
     df = BigQueryConverter.convert_query_state_to_prediction(
         conversation.exchanges[-1], log_snapshots, conversation.session_id
     )
-    load_prediction_data_to_bq(df)
+    load_status = load_prediction_data_to_bq(df)
+    if load_status:
+        Container.logger().info(msg="Successfully wrote into BQ Prediction table")
+    else:
+        Container.logger().info(msg="Error in writing into BQ Prediction table")
 
 
 def load_prediction_data_to_bq(df: pd.DataFrame) -> None:
@@ -134,13 +138,17 @@ def load_prediction_data_to_bq(df: pd.DataFrame) -> None:
         job = client.load_table_from_dataframe(df, table_id, job_config=job_config)
         job.result()
         print(f"Loaded {job.output_rows} rows into {table_id}.")
+        
     except GoogleAPIError as e:
-        print(f"An error occurred: {e}")
+        Container.logger().error(msg="Crashed on writing into BQ Prediction table")
+        Container.logger().error(msg=str(e))
         if job and job.errors:
             for error in job.errors:
                 print(f"Error: {error['message']}")
                 if "location" in error:
                     print(f"Field that caused the error: {error['location']}")
+        return False
+    return True
 
 
 def log_system_status(session_id: str) -> str:
