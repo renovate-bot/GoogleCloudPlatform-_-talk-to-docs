@@ -36,7 +36,6 @@ from google.cloud.bigquery.schema import SchemaField
 
 from gen_ai.common.ioc_container import Container
 from gen_ai.common.memorystore_utils import convert_dict_to_relevancies, convert_dict_to_summaries
-from gen_ai.constants import MAX_OUTPUT_TOKENS
 from gen_ai.deploy.model import Conversation, QueryState
 
 
@@ -173,7 +172,8 @@ def log_system_status(session_id: str) -> str:
     gcs_bucket = Container.config["gcs_source_bucket"]
     model_name = Container.config["model_name"]
     temperature = Container.config["temperature"]
-    pipeline_parameters = f"model: {model_name}; temperature: {temperature}; max_tokens: {MAX_OUTPUT_TOKENS}"
+    max_output_tokens = Container.config["MAX_OUTPUT_TOKENS"]
+    pipeline_parameters = f"model: {model_name}; temperature: {temperature}; max_tokens: {max_output_tokens}"
     
     comments = Container.comments
     system_state_id = str(uuid.uuid5(uuid.NAMESPACE_DNS,f"{git_hash}-{gcs_bucket}-{pipeline_parameters}-{comments or ''}"))
