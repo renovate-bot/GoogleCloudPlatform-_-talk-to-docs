@@ -16,7 +16,7 @@ import subprocess
 
 import click
 from gen_ai.common import common
-from gen_ai.constants import LLM_YAML_FILE, PROCESSED_FILES_DIR
+from gen_ai.constants import LLM_YAML_FILE
 
 
 def create_directory(directory: str):
@@ -53,16 +53,16 @@ def copy_from_gcs(gcs_bucket: str, destination_folder: str):
     """
     gsutil_command = f"gsutil -m cp -r {gcs_bucket}/* {destination_folder}"
     try:
-        result = subprocess.run(gsutil_command, shell=True, check=True, capture_output=True)
+        result = subprocess.run(
+            gsutil_command, shell=True, check=True, capture_output=True
+        )
         print(result.stdout.decode("utf-8"))
     except subprocess.CalledProcessError as e:
         print(f"gsutil copy failed: {e.stderr.decode('utf-8')}")
 
-
 @click.command()
 @click.argument("gcs_source_bucket", required=False)
-@click.option("--use-home", is_flag=True, help="Use the home directory ($HOME/resources) as the base directory instead of /mnt/resources.")
-def copy_resources(gcs_source_bucket: str | None = None, use_home: bool = False):
+def copy_resources(gcs_source_bucket: str | None = None):
     """Copies resources from a Google Cloud Storage (GCS) bucket to a local directory.
 
     This function performs the following steps:
@@ -70,19 +70,15 @@ def copy_resources(gcs_source_bucket: str | None = None, use_home: bool = False)
     1. **Loads configuration:** Retrieves the GCS bucket name from a YAML configuration file.
     2. **Defines base path:** Sets the base directory for storing resources.
     3. **Determines company-specific directory:** Creates a subdirectory for a specified company.
-    4. **Handles existing directories:** If the company directory already exists, it is removed
+    4. **Handles existing directories:** If the company directory already exists, it is removed 
     to ensure fresh resources are copied.
     5. **Creates necessary directories:** Creates the full path for resource storage, including any intermediate directories.
-    6. **Copies resources from GCS:** Calls the `copy_from_gcs` function to transfer resources from
+    6. **Copies resources from GCS:** Calls the `copy_from_gcs` function to transfer resources from 
     the GCS bucket to the local directory.
     """
 
     config = common.load_yaml(LLM_YAML_FILE)
-    if use_home:
-        home_path = os.getenv("HOME")
-        base_path = f"{home_path}/resources"
-    else:
-        base_path = "/mnt/resources"
+    base_path = "/mnt/resources"
     gcs_bucket = gcs_source_bucket or config["gcs_source_bucket"]
     dataset_name = config["dataset_name"]
 
