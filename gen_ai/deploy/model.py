@@ -163,7 +163,6 @@ class QueryState:
         attributes_to_kc_km: List of dictionaries, that represents information from KC, type KM. See LLMOutput
         attributes_to_kc_mp: List of dictionaries, that represents information from KC, type MP. See LLMOutput
         attributes_to_b360: List of dictionaries, that represents information from B360. See LLMOutput
-        post_filtered_docs: List of documents that were used to generate answer
     """
 
     question: str
