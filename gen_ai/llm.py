@@ -26,9 +26,9 @@ Dependencies:
     - json5: Used for JSON parsing.
 """
 
+import uuid
 from timeit import default_timer
 from typing import Any
-import uuid
 
 import json5
 from dependency_injector.wiring import inject
@@ -36,15 +36,14 @@ from langchain.chains import LLMChain
 from langchain.schema import Document
 
 from gen_ai.common.argo_logger import create_log_snapshot
-from gen_ai.common.bq_utils import BigQueryConverter, create_bq_client, load_data_to_bq, get_dataset_id, log_question
+from gen_ai.common.bq_utils import load_data_to_bq
 from gen_ai.common.common import merge_outputs, remove_duplicates
-from gen_ai.common.document_utils import generate_contexts_from_docs
 from gen_ai.common.ioc_container import Container
 from gen_ai.common.memorystore_utils import serialize_previous_conversation
-from gen_ai.common.react_utils import get_confidence_score, filter_non_relevant_previous_conversations
+from gen_ai.common.react_utils import filter_non_relevant_previous_conversations, get_confidence_score
 from gen_ai.common.retriever import perform_retrieve_round, retrieve_initial_documents
 from gen_ai.common.statefullness import resolve_and_enrich, serialize_response
-from gen_ai.create_tables import schema_prediction
+from gen_ai.common.document_utils import generate_contexts_from_docs
 from gen_ai.deploy.model import Conversation, PersonalizedData, QueryState, transform_to_dictionary
 
 
@@ -121,7 +120,6 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
 
     query_state = conversation.exchanges[-1]
     question = query_state.question
-    log_question(question)
 
     query_state.react_rounds = []
     log_snapshots = []
@@ -379,6 +377,8 @@ def respond(conversation: Conversation, member_info: dict) -> Conversation:
         conversation.member_info["set_number"] = conversation.member_info["set_number"].lower()
     if conversation.member_info and "session_id" in conversation.member_info:
         conversation.session_id = conversation.member_info["session_id"]
+    else:
+        conversation.session_id = str(uuid.uuid4())
 
     api_mode = Container.config.get("api_mode", "stateless")
     statefullness_enabled = api_mode == "stateful"
@@ -393,13 +393,7 @@ def respond(conversation: Conversation, member_info: dict) -> Conversation:
     if statefullness_enabled:
         serialize_response(conversation)
 
-    df = BigQueryConverter.convert_query_state_to_prediction(
-        conversation.exchanges[-1], log_snapshots, conversation.session_id
-    )
-    client = create_bq_client()
-    dataset_id = get_dataset_id()
-    table_id = f"{dataset_id}.prediction"
-    load_data_to_bq(client, table_id, schema_prediction, df)
+    Container.logging_bq_executor().submit(load_data_to_bq, conversation, log_snapshots)
 
     return conversation
 

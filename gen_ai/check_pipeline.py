@@ -129,8 +129,7 @@ def run_pipeline(mode: Literal["batch", "step"] = "step", csv_path: str = None, 
             Container.logger().info(msg=f"Asking question {idx} in document ")
             Container.logger().info(msg=f"Question: {input_query}")
             answer = run_single_prediction(
-                input_query,
-                {"set_number": "001acis", "member_id": "q123", "session_id": "123"},
+                input_query, {"set_number": "001acis", "member_id": "q123", "session_id": "123"}
             )
             Container.logger().info(msg=f"Answer: {answer}")
         end = default_timer()

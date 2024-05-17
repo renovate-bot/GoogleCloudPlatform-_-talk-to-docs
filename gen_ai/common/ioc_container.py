@@ -26,10 +26,14 @@ Usage:
 
 import logging
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from logging import Logger
 
+import google.auth
 import redis
 from dependency_injector import containers, providers
+from google.api_core.exceptions import GoogleAPIError
+from google.cloud import bigquery
 from langchain.chains import LLMChain
 from langchain.chains.base import Chain
 from langchain.prompts import PromptTemplate
@@ -40,9 +44,32 @@ import gen_ai.common.common as common
 from gen_ai.common.embeddings_provider import EmbeddingsProvider
 from gen_ai.common.exponential_retry import LLMExponentialRetryWrapper
 from gen_ai.common.storage import UhgStorage
-from gen_ai.common.vector_provider import VectorStrategy, VectorStrategyProvider
+from gen_ai.common.vector_provider import (VectorStrategy,
+                                           VectorStrategyProvider)
 from gen_ai.constants import LLM_YAML_FILE, MEMORY_STORE_IP
 
+
+def create_bq_client(project_id: str | None = None) -> bigquery.Client | None:
+    """Creates a BigQuery client.
+    If project_id is not specified, the default project ID will be used.
+    If the default project ID cannot be determined, an error will be raised.
+    Args:
+        project_id (str, optional): The project ID to use. Defaults to None.
+    Returns:
+        A BigQuery client.
+    """
+    if project_id is None:
+        try:
+            _, project_id = google.auth.default()
+        except GoogleAPIError as e:
+            print(f"Failed to authenticate: {e}")
+            return None
+    try:
+        client = bigquery.Client(project=project_id)
+    except GoogleAPIError as e:
+        print(f"Failed to create BigQuery client: {e}")
+        return None
+    return client
 
 def provide_chain(template_name: str, input_variables: list[str], output_key: str, llm: LLMChain = None) -> Chain:
     """
@@ -154,6 +181,11 @@ class Container(containers.DeclarativeContainer):
         vector_indices (Chroma): Chroma vector indices initialized based on configuration.
         redis_db (Provider): Provides a Redis database connection.
         debug_info (bool): Indicates whether debugging is enabled.
+        system_state_id (str | None): System state id
+        question_id (str | None): Question id
+        logging_bq_executor (Provider): Provides Thread Pool Executor
+        logging_bq_client (Provider): Provides BigQuery client
+
 
     Usage:
         Components from the container can be accessed as attributes and are instantiated as needed with configurations
@@ -204,3 +236,5 @@ class Container(containers.DeclarativeContainer):
     comments = "None"
     system_state_id = None
     question_id = None
+    logging_bq_executor = providers.Singleton(ThreadPoolExecutor, max_workers=1)
+    logging_bq_client = providers.Singleton(create_bq_client, config.get("bq_project_id"))

@@ -22,45 +22,22 @@ Exceptions:
 import datetime
 import getpass
 import json
-import uuid
-import git
 import os
 import re
+import uuid
+from typing import Any
 
+import git
 import google.auth
 import pandas as pd
 from google.api_core.exceptions import GoogleAPIError, NotFound
 from google.cloud import bigquery
 from google.cloud.bigquery.schema import SchemaField
 
-from gen_ai.common.document_utils import convert_dict_to_summaries
+from gen_ai.common.document_utils import convert_dict_to_relevancies, convert_dict_to_summaries
 from gen_ai.common.ioc_container import Container
-from gen_ai.common.document_utils import convert_dict_to_relevancies
-from gen_ai.deploy.model import QueryState
 from gen_ai.constants import MAX_OUTPUT_TOKENS
-
-
-def create_bq_client(project_id: str | None = None) -> bigquery.Client | None:
-    """Creates a BigQuery client.
-    If project_id is not specified, the default project ID will be used.
-    If the default project ID cannot be determined, an error will be raised.
-    Args:
-        project_id (str, optional): The project ID to use. Defaults to None.
-    Returns:
-        A BigQuery client.
-    """
-    if project_id is None:
-        try:
-            _, project_id = google.auth.default()
-        except GoogleAPIError as e:
-            print(f"Failed to authenticate: {e}")
-            return None
-    try:
-        client = bigquery.Client(project=project_id)
-    except GoogleAPIError as e:
-        print(f"Failed to create BigQuery client: {e}")
-        return None
-    return client
+from gen_ai.deploy.model import Conversation, QueryState
 
 
 def create_dataset(
@@ -117,29 +94,62 @@ def create_table(
         print(f"Table {table_id} created.")
 
 
-def load_data_to_bq(client: bigquery.Client, table_id: str, schema: list[SchemaField], df: pd.DataFrame) -> None:
+def load_data_to_bq(conversation: Conversation, log_snapshots: list[dict[str, Any]]):
+    """Loads prediction data, question and exeriments information to BigQuery.
+
+    This function prepares and loads relevant data from a conversation into BigQuery.
+    The process involves extracting the latest question from the conversation,
+    logging it for reference, and transforming the data into a format
+    suitable for BigQuery using the `BigQueryConverter`.
+
+    Args:
+        conversation: A Conversation object containing the full conversation history.
+        log_snapshots: A list of log snapshot objects containing relevant metadata.
+    """
+    query_state = conversation.exchanges[-1]
+    question = query_state.question
+    log_question(question)
+    df = BigQueryConverter.convert_query_state_to_prediction(
+        conversation.exchanges[-1], log_snapshots, conversation.session_id
+    )
+    load_status = load_prediction_data_to_bq(df)
+    if load_status:
+        Container.logger().info(msg="Successfully wrote into BQ Prediction table")
+    else:
+        Container.logger().info(msg="Error in writing into BQ Prediction table")
+
+
+def load_prediction_data_to_bq(df: pd.DataFrame) -> None:
     """Loads data from a pandas DataFrame to a BigQuery table.
     The table will be created if it does not already exist.
     If the table already exists, it will be overwritten.
     Args:
-        client (bigquery.Client): The BigQuery client.
-        table_id (str): The ID of the table to load data to.
-        schema (List[bigquery.SchemaField]): The schema of the table.
         df (pandas.DataFrame): The DataFrame to load data from.
     """
+    client = Container.logging_bq_client()
+    dataset_id = get_dataset_id()
+
+    table_id = f"{dataset_id}.prediction"
+    table = client.get_table(table_id)
+    schema = table.schema
+
     job_config = bigquery.LoadJobConfig(schema=schema)
     job = None
     try:
         job = client.load_table_from_dataframe(df, table_id, job_config=job_config)
         job.result()
         print(f"Loaded {job.output_rows} rows into {table_id}.")
+
     except GoogleAPIError as e:
-        print(f"An error occurred: {e}")
+        Container.logger().error(msg="Crashed on writing into BQ Prediction table")
+        Container.logger().error(msg=str(e))
         if job and job.errors:
             for error in job.errors:
                 print(f"Error: {error['message']}")
                 if "location" in error:
                     print(f"Field that caused the error: {error['location']}")
+        return False
+    return True
 
 
 def log_system_status(session_id: str) -> str:
@@ -235,7 +245,7 @@ def insert_data_to_table(table_name: str, data: dict[str, str]) -> bool:
     Returns:
         bool: True if the insertion was successful, False otherwise.
     """
-    client = create_bq_client()
+    client = Container.logging_bq_client()
     dataset_id = get_dataset_id()
     table = client.get_table(f"{dataset_id}.{table_name}")
 
