@@ -43,7 +43,7 @@ from gen_ai.common.memorystore_utils import serialize_previous_conversation
 from gen_ai.common.react_utils import get_confidence_score
 from gen_ai.common.retriever import perform_retrieve_round, retrieve_initial_documents
 from gen_ai.common.statefullness import resolve_and_enrich, serialize_response
-from gen_ai.constants import MAX_CONTEXT_SIZE
+from gen_ai.custom_client_functions import fill_query_state_with_doc_attributes
 from gen_ai.deploy.model import Conversation, PersonalizedData, QueryState, transform_to_dictionary
 
 
@@ -124,20 +124,21 @@ def generate_contexts_from_docs(docs_and_scores: list[Document], query_state: Qu
     token_counts = [0]
     used_articles = []
     token_counter: TokenCounter = Container.token_counter()
+    max_context_size = Container.config.get("MAX_CONTEXT_SIZE", 30000)
 
     for doc in docs_and_scores:
         filename = doc.metadata["section_name"]
 
         doc_content = doc.page_content if Container.config.get("use_full_documents", False) else doc.metadata["summary"]
         doc_tokens = token_counter.get_num_tokens_from_string(doc_content)
-        if doc_tokens > MAX_CONTEXT_SIZE:
-            doc_chunks = split_large_document(doc_content, MAX_CONTEXT_SIZE)
+        if doc_tokens > max_context_size:
+            doc_chunks = split_large_document(doc_content, max_context_size)
         else:
             doc_chunks = [(doc_content, doc_tokens)]
 
         for doc_chunk, doc_tokens in doc_chunks:
 
-            if token_counts[-1] + doc_tokens >= MAX_CONTEXT_SIZE:
+            if token_counts[-1] + doc_tokens >= max_context_size:
                 token_counts.append(0)
                 contexts.append("\n")
                 num_docs_used.append(0)
@@ -393,68 +394,6 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
     query_state = fill_query_state_with_doc_attributes(query_state, post_filtered_docs)
 
     return conversation, log_snapshots
-
-
-def fill_query_state_with_doc_attributes(query_state: QueryState, post_filtered_docs: list[Document]) -> QueryState:
-    """
-    Updates the provided query_state object with attributes extracted from documents after filtering.
-
-    This function modifies the query_state object by setting various attributes based on the metadata of documents
-    in the post_filtered_docs list. It processes documents to categorize them by their data source
-    (B360, KM or MP from KC), and updates the query_state with URLs, and categorized attributes for each type.
-
-    Args:
-        query_state (QueryState): The query state object that needs to be updated with document attributes.
-        post_filtered_docs (list[Document]): A list of Document objects that have been filtered and whose attributes
-        are to be extracted.
-
-    Returns:
-        QueryState: The updated query state object with new attributes set based on the provided documents.
-
-    Side effects:
-        Modifies the query_state object by setting the following attributes:
-        - urls: A set of unique URLs extracted from the document metadata.
-        - attributes_to_b360: A list of dictionaries with attributes from B360 documents.
-        - attributes_to_kc_km: A list of dictionaries with attributes from KC KM documents.
-        - attributes_to_kc_mp: A list of dictionaries with attributes from KC MP documents.
-
-    """
-    query_state.urls = list(set(document.metadata["url"] for document in post_filtered_docs))
-
-    # B360 documents
-    b360_docs = [x for x in post_filtered_docs if x.metadata["data_source"] == "b360"]
-    attributes_to_b360 = [
-        {"set_number": x.metadata["set_number"], "section_name": x.metadata["section_name"]} for x in b360_docs
-    ]
-
-    # KC documents, they can be of two types: from KM (dont have policy number) and from MP (have policy number)
-    kc_docs = [x for x in post_filtered_docs if x.metadata["data_source"] == "kc"]
-    kc_km_docs = [x for x in kc_docs if not x.metadata["policy_number"]]
-    kc_mp_docs = [x for x in kc_docs if x.metadata["policy_number"]]
-
-    attributes_to_kc_km = [
-        {
-            "doc_type": "km",
-            "doc_identifier": x.metadata["doc_identifier"],
-            "url": x.metadata["url"],
-            "section_name": x.metadata["section_name"],
-        }
-        for x in kc_km_docs
-    ]
-    attributes_to_kc_mp = [
-        {
-            "doc_type": "mp",
-            "original_filepath": x.metadata["original_filepath"],
-            "policy_number": x.metadata["policy_number"],
-            "section_name": x.metadata["section_name"],
-        }
-        for x in kc_mp_docs
-    ]
-
-    query_state.attributes_to_b360 = attributes_to_b360
-    query_state.attributes_to_kc_km = attributes_to_kc_km
-    query_state.attributes_to_kc_mp = attributes_to_kc_mp
-    return query_state
 
 
 def respond(conversation: Conversation, member_info: dict) -> Conversation:

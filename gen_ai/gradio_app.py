@@ -7,12 +7,10 @@ import os
 from dataclasses import asdict
 from datetime import datetime
 
-import customer
 import gradio as gr
 import llm
 from dotenv import load_dotenv
 
-from gen_ai.constants import FAVICON_PATH, LOGS_DIRECTORY, SSL_CERTFILE, SSL_KEYFILE, USERS_FILE
 from gen_ai.deploy.model import Conversation, QueryState
 from gen_ai.common.ioc_container import Container
 
@@ -31,6 +29,22 @@ DATABASES = {
     }
 }
 
+THEME_HUE = gr.themes.Color(
+    "#E5F1FB",
+    "#CFE5F7",
+    "#9BC9EE",
+    "#6BAEE6",
+    "#3792DD",
+    "#2075BC",
+    "#195D94",
+    "#134771",
+    "#0D2E4A",
+    "#071927",
+    "#030B11",
+    "UHG",
+)
+
+LOGO = "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/UnitedHealth_Group_logo.svg/444px-UnitedHealth_Group_logo.svg.png"
 
 # Predict function
 def predict(conversation: Conversation, input_query, input_metadata, request: gr.Request):
@@ -87,8 +101,9 @@ def log_interim_state(
     date_time = conversation.date_time
     username = conversation.user
     exchange_num = len(conversation.exchanges)
+    logs_directory = Container.config.get("LOGS_DIRECTORY", "gen_ai/logs")
     with open(
-        f"{LOGS_DIRECTORY}/{username}__{conversation_num}__{date_time}__interim__{exchange_num}.json",
+        f"{logs_directory}/{username}__{conversation_num}__{date_time}__interim__{exchange_num}.json",
         "a",
         encoding="utf-8",
     ) as feedback_file:
@@ -129,8 +144,9 @@ def feedback(
 
     conversation_num = conversation.conversation_num
     date_time = conversation.date_time
+    logs_directory = Container.config.get("LOGS_DIRECTORY", "gen_ai/logs")
     with open(
-        f"{LOGS_DIRECTORY}/{request.username}__{conversation_num}__{date_time}.json",
+        f"{logs_directory}/{request.username}__{conversation_num}__{date_time}.json",
         "a",
         encoding="utf-8",
     ) as feedback_file:
@@ -182,10 +198,10 @@ def authenticate(username, password):
     default_auth_users = {
         gradio_user: gradio_password,
     }
-
+    users_file_path = Container.config.get("USERS_FILE", False)
     auth_users = {}
-    if os.path.isfile(USERS_FILE):
-        with open(USERS_FILE, "r", encoding="utf-8") as users_file:
+    if os.path.isfile(users_file_path):
+        with open(users_file_path, "r", encoding="utf-8") as users_file:
             auth_users = json.load(users_file)
     auth_users.update(default_auth_users)
     if username in auth_users:
@@ -206,9 +222,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Gradio app for LLM Chatbot.")
     parser.add_argument("--use_ft", action="store_true", help="Use fine-tuned model")
     args = parser.parse_args()
+    logs_directory = Container.config.get("LOGS_DIRECTORY", "gen_ai/logs")
 
-    if not os.path.exists(LOGS_DIRECTORY):
-        os.makedirs(LOGS_DIRECTORY)
+    if not os.path.exists(logs_directory):
+        os.makedirs(logs_directory)
 
     # Gradio interface code starts here
     with gr.Blocks(
@@ -217,7 +234,7 @@ if __name__ == "__main__":
             .gradio-container { min-height: 0px !important; } 
             h1 {color: #204031; }
         """,
-        theme=gr.themes.Default(primary_hue=customer.THEME_HUE, secondary_hue="orange"),
+        theme=gr.themes.Default(primary_hue=THEME_HUE, secondary_hue="orange"),
     ) as gradio_app:
         gradio_app.queue()
         session_conversation = gr.State(Conversation(exchanges=[]))
@@ -246,7 +263,7 @@ if __name__ == "__main__":
                 gr.HTML(
                     f"""
                     <div style='display: flex; align-items: center; justify-content: flex-end; width: 100%;'>
-                        <img src='{customer.LOGO}' 
+                        <img src='{LOGO}' 
                             alt='Logo' style='max-height:50px; transform: scale(0.7);'>
                     </div>
                     """
@@ -408,10 +425,6 @@ if __name__ == "__main__":
             outputs=chatbot,
         )
 
-        use_ssl = os.environ.get("PORT") and (int(os.environ.get("PORT")) == 443 or int(os.environ.get("PORT")) == 7861)
-        ssl_keyfile = SSL_KEYFILE if use_ssl else None
-        ssl_certfile = SSL_CERTFILE if use_ssl else None
-        FAVICON_PATH_USED = FAVICON_PATH if os.path.isfile(FAVICON_PATH) else None
         server_name = "0.0.0.0"  # if use_ssl else "127.0.0.1"
 
         print("Starting UI server...")
@@ -420,14 +433,11 @@ if __name__ == "__main__":
             debug=Container.config.get("is_debug", False),
             show_error=True,
             max_threads=2,
-            favicon_path=FAVICON_PATH_USED,
             show_api=False,
             root_path=Container.config.get("gradio_root_path", None),
             server_name=server_name,
             server_port=int(os.environ.get("PORT", 7860)),
             auth=authenticate,
             ssl_verify=False,
-            ssl_keyfile=ssl_keyfile,
-            ssl_certfile=ssl_certfile,
             share=False,
         )
