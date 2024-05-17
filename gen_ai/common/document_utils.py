@@ -100,6 +100,7 @@ def build_doc_title(metadata: dict[str, str]) -> str:
             - "section_name": The name of the relevant section.
             - "doc_identifier": A unique identifier for the document.
             - "policy_number": The specific number of the associated policy.
+            - "symbols": The symbols of the document.
 
     Returns:
         str: A concatenated string containing the document title information
@@ -107,14 +108,16 @@ def build_doc_title(metadata: dict[str, str]) -> str:
 
     """
     doc_title = ""
-    if metadata["set_number"]:
+    if metadata.get("set_number"):
         doc_title += metadata["set_number"] + " "
-    if metadata["section_name"]:
+    if metadata.get("section_name"):
         doc_title += metadata["section_name"] + " "
-    if metadata["doc_identifier"]:
+    if metadata.get("doc_identifier"):
         doc_title += metadata["doc_identifier"] + " "
-    if metadata["policy_number"]:
+    if metadata.get("policy_number"):
         doc_title += metadata["policy_number"] + " "
+    if metadata.get("symbols"):
+        doc_title += metadata["symbols"] + " "
     return doc_title
 
 
