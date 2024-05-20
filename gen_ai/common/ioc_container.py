@@ -221,6 +221,13 @@ class Container(containers.DeclarativeContainer):
         provide_chain, "similar_questions_prompt", ["question", "similar_questions_number"], "similar_questions"
     )
 
+    previous_conversation_relevancy_chain = providers.Singleton(
+        provide_chain,
+        "previous_conversation_scoring_prompt",
+        ["previous_question", "previous_answer", "previous_additional_information_to_retrieve", "question"],
+        "text",
+    )
+
     token_counter = providers.Singleton(common.provide_token_counter)
 
     logger = providers.Singleton(provide_logger)
