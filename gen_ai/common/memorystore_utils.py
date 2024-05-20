@@ -23,7 +23,7 @@ def generate_query_state_key(personalized_data: dict[str, str], unique_identifie
     """
     Generates a unique key for storing a query state in Redis.
 
-    The key is constructed using the member id number and set number from the personalized data, along with a
+    The key is constructed using the member id number from the personalized data, along with a
     unique identifier.
 
     Args:
@@ -33,7 +33,7 @@ def generate_query_state_key(personalized_data: dict[str, str], unique_identifie
     Returns:
         str: A string key uniquely identifying a query state for storage in Redis.
     """
-    the_key = f"query_state:{personalized_data['member_id']}:{personalized_data['set_number']}"
+    the_key = f"query_state:{personalized_data['member_id']}"
     if "session_id" in personalized_data and personalized_data["session_id"]:
         the_key = f"{the_key}:{personalized_data['session_id']}"
     else:
