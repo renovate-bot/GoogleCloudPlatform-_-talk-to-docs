@@ -135,14 +135,17 @@ def provide_vector_indices(regenerate: bool = False) -> Chroma:
 
 def provide_logger() -> Logger:
     client = google.cloud.logging.Client()
-    client.setup_logging()
+    cloud_handler = client.get_default_handler()
+    formatter = logging.Formatter("%(asctime)s: %(levelname)s: %(message)s")
     stdout_handler = logging.StreamHandler(stream=sys.stdout)
-    logging.basicConfig(
-        level=logging.INFO,
-        handlers=[stdout_handler],
-        format="%(asctime)s: %(levelname)s: %(message)s",
-    )
-    return logging.getLogger()
+    stdout_handler.setFormatter(formatter)
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    logger.addHandler(cloud_handler)
+    logger.addHandler(stdout_handler) 
+
+    return logger
 
 
 def provide_redis() -> redis.Redis:
