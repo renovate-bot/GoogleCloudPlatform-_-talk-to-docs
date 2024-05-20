@@ -45,8 +45,7 @@ import gen_ai.common.common as common
 from gen_ai.common.embeddings_provider import EmbeddingsProvider
 from gen_ai.common.exponential_retry import LLMExponentialRetryWrapper
 from gen_ai.common.storage import UhgStorage
-from gen_ai.common.vector_provider import (VectorStrategy,
-                                           VectorStrategyProvider)
+from gen_ai.common.vector_provider import VectorStrategy, VectorStrategyProvider
 from gen_ai.constants import LLM_YAML_FILE, MEMORY_STORE_IP
 
 
@@ -71,6 +70,7 @@ def create_bq_client(project_id: str | None = None) -> bigquery.Client | None:
         print(f"Failed to create BigQuery client: {e}")
         return None
     return client
+
 
 def provide_chain(template_name: str, input_variables: list[str], output_key: str, llm: LLMChain = None) -> Chain:
     """
@@ -143,7 +143,7 @@ def provide_logger() -> Logger:
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     logger.addHandler(cloud_handler)
-    logger.addHandler(stdout_handler) 
+    logger.addHandler(stdout_handler)
 
     return logger
 
