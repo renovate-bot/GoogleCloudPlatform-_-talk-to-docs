@@ -45,8 +45,7 @@ import gen_ai.common.common as common
 from gen_ai.common.embeddings_provider import EmbeddingsProvider
 from gen_ai.common.exponential_retry import LLMExponentialRetryWrapper
 from gen_ai.common.storage import UhgStorage
-from gen_ai.common.vector_provider import (VectorStrategy,
-                                           VectorStrategyProvider)
+from gen_ai.common.vector_provider import VectorStrategy, VectorStrategyProvider
 from gen_ai.constants import LLM_YAML_FILE, MEMORY_STORE_IP
 
 
@@ -71,6 +70,7 @@ def create_bq_client(project_id: str | None = None) -> bigquery.Client | None:
         print(f"Failed to create BigQuery client: {e}")
         return None
     return client
+
 
 def provide_chain(template_name: str, input_variables: list[str], output_key: str, llm: LLMChain = None) -> Chain:
     """
@@ -135,14 +135,17 @@ def provide_vector_indices(regenerate: bool = False) -> Chroma:
 
 def provide_logger() -> Logger:
     client = google.cloud.logging.Client()
-    client.setup_logging()
+    cloud_handler = client.get_default_handler()
+    formatter = logging.Formatter("%(asctime)s: %(levelname)s: %(message)s")
     stdout_handler = logging.StreamHandler(stream=sys.stdout)
-    logging.basicConfig(
-        level=logging.INFO,
-        handlers=[stdout_handler],
-        format="%(asctime)s: %(levelname)s: %(message)s",
-    )
-    return logging.getLogger()
+    stdout_handler.setFormatter(formatter)
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    logger.addHandler(cloud_handler)
+    logger.addHandler(stdout_handler)
+
+    return logger
 
 
 def provide_redis() -> redis.Redis:
