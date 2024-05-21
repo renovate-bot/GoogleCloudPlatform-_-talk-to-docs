@@ -11,7 +11,29 @@ from langchain_community.vectorstores.chroma import Chroma
 from gen_ai.common.document_retriever import SemanticDocumentRetriever
 from typing import Any
 
-def fill_query_state_with_doc_attributes(query_state: QueryState, post_filtered_docs: list[Document]) -> QueryState:
+
+def default_fill_query_state_with_doc_attributes(query_state: QueryState, post_filtered_docs: list[Document]) -> QueryState:
+    """Updates the provided query_state object with attributes extracted from documents after filtering.
+
+    This function iterates through each document in the `post_filtered_docs` list.  For each key-value pair in a document's metadata, it adds the value to the corresponding list in the `custom_fields` field of the `query_state`. If the key doesn't exist yet, a new list is created.
+
+    Args:
+        query_state: The QueryState object to be modified.
+        post_filtered_docs: A list of Document objects containing metadata.
+
+    Returns:
+        The modified QueryState object, with custom_fields updated based on document metadata.
+    """
+    for document in post_filtered_docs:
+        for key, value in document.metadata.items():
+            if key not in query_state.custom_fields:
+                query_state.custom_fields[key] = []
+            query_state.custom_fields[key].append(value)
+
+    return query_state
+
+
+def custom_fill_query_state_with_doc_attributes(query_state: QueryState, post_filtered_docs: list[Document]) -> QueryState:
     """
     Updates the provided query_state object with attributes extracted from documents after filtering.
 
@@ -66,11 +88,45 @@ def fill_query_state_with_doc_attributes(query_state: QueryState, post_filtered_
         }
         for x in kc_mp_docs
     ]
+    query_state.custom_fields["attributes_to_b360"] = attributes_to_b360
+    query_state.custom_fields["attributes_to_kc_km"] = attributes_to_kc_km
+    query_state.custom_fields["attributes_to_kc_mp"] = attributes_to_kc_mp
 
-    query_state.attributes_to_b360 = attributes_to_b360
-    query_state.attributes_to_kc_km = attributes_to_kc_km
-    query_state.attributes_to_kc_mp = attributes_to_kc_mp
     return query_state
+
+
+def default_extract_doc_attributes(docs_and_scores: list[Document]) -> list[tuple[str]]:
+    """Extracts all metadata attributes from a list of Document objects.
+
+    Args:
+        docs_and_scores: A list of Document objects, typically returned from a search operation.
+
+    Returns:
+        A list of tuples where each tuple contains all metadata attributes from a Document, in an arbitrary order. The order of the attributes in each tuple may vary depending on the underlying dictionary implementation.
+    """
+    return [
+        tuple([value for _, value in x.metadata.items()])
+        for x in docs_and_scores
+    ]
+
+
+def custom_extract_doc_attributes(docs_and_scores: list[Document]) -> list[tuple[str]]:
+    """Extracts specific metadata attributes from a list of Document objects.
+
+    Args:
+        docs_and_scores: A list of Document objects, typically returned from a search operation.
+
+    Returns:
+        A list of tuples where each tuple contains the following metadata attributes from a Document:
+            - original_filepath: The original file path of the document.
+            - doc_identifier: A unique identifier for the document.
+            - section_name: The name of the section within the document.
+    """
+    return [
+        (x.metadata["original_filepath"], x.metadata["doc_identifier"], x.metadata["section_name"])
+        for x in docs_and_scores
+    ]
+
 
 def remove_member_and_session_id(metadata: dict[str, Any]) -> dict[str, Any]:
     """Removes the "member_id" key and "session_id" from a metadata dictionary.
@@ -126,7 +182,6 @@ class CustomStorage(Storage):
         return documents_hashmap
 
 
-
 class CustomSemanticDocumentRetriever(SemanticDocumentRetriever):
     """Implements document retrieval based on semantic similarity from a Chroma store.
 
@@ -165,3 +220,38 @@ class CustomSemanticDocumentRetriever(SemanticDocumentRetriever):
             docs.extend(self._get_related_docs_from_store(store, questions_for_search, metadata))
 
         return docs
+
+
+def default_build_doc_title(metadata: dict[str, str]) -> str:
+    """Constructs a document title string based on provided metadata.
+
+    This function takes a dictionary containing various metadata fields,
+    including "set_number," "section_name," "doc_identifier," and "policy_number."
+    It concatenates these values to form a document title string.
+
+    Args:
+        metadata (dict[str, str]): A dictionary with potential metadata fields.
+            - "set_number": An identifier representing the set number.
+            - "section_name": The name of the relevant section.
+            - "doc_identifier": A unique identifier for the document.
+            - "policy_number": The specific number of the associated policy.
+
+    Returns:
+        str: A concatenated string containing the document title information
+        based on the provided metadata fields.
+
+    """
+    doc_title = ""
+    if metadata.get("set_number"):
+        doc_title += metadata["set_number"] + " "
+    if metadata.get("section_name"):
+        doc_title += metadata["section_name"] + " "
+    if metadata.get("doc_identifier"):
+        doc_title += metadata["doc_identifier"] + " "
+    if metadata.get("policy_number"):
+        doc_title += metadata["policy_number"] + " "
+    return doc_title
+
+build_doc_title = default_build_doc_title
+extract_doc_attributes = default_extract_doc_attributes
+fill_query_state_with_doc_attributes = default_fill_query_state_with_doc_attributes

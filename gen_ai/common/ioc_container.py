@@ -123,7 +123,9 @@ def provide_vector_indices(regenerate: bool = False) -> Chroma:
     embeddings_name = config.get("embeddings_name")
     embeddings_model_name = config.get("embeddings_model_name")
     vector_name = config.get("vector_name")
-    processed_files_dir = config.get("PROCESSED_FILES_DIR")
+    dataset_name = config.get("dataset_name")
+    processed_files_dir = config.get("PROCESSED_FILES_DIR").format(dataset_name=dataset_name)
+    print(f"\ntesting processed files dir: {processed_files_dir}\n")
     vectore_store_path = config.get("VECTOR_STORE_PATH")
 
     embeddings_provider = EmbeddingsProvider(embeddings_name, embeddings_model_name)

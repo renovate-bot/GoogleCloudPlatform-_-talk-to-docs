@@ -43,39 +43,8 @@ from gen_ai.common.memorystore_utils import serialize_previous_conversation
 from gen_ai.common.react_utils import get_confidence_score
 from gen_ai.common.retriever import perform_retrieve_round, retrieve_initial_documents
 from gen_ai.common.statefullness import resolve_and_enrich, serialize_response
-from gen_ai.custom_client_functions import fill_query_state_with_doc_attributes
+from gen_ai.custom_client_functions import fill_query_state_with_doc_attributes, build_doc_title, extract_doc_attributes
 from gen_ai.deploy.model import Conversation, PersonalizedData, QueryState, transform_to_dictionary
-
-
-def build_doc_title(metadata: dict[str, str]) -> str:
-    """Constructs a document title string based on provided metadata.
-
-    This function takes a dictionary containing various metadata fields,
-    including "set_number," "section_name," "doc_identifier," and "policy_number."
-    It concatenates these values to form a document title string.
-
-    Args:
-        metadata (dict[str, str]): A dictionary with potential metadata fields.
-            - "set_number": An identifier representing the set number.
-            - "section_name": The name of the relevant section.
-            - "doc_identifier": A unique identifier for the document.
-            - "policy_number": The specific number of the associated policy.
-
-    Returns:
-        str: A concatenated string containing the document title information
-        based on the provided metadata fields.
-
-    """
-    doc_title = ""
-    if metadata["set_number"]:
-        doc_title += metadata["set_number"] + " "
-    if metadata["section_name"]:
-        doc_title += metadata["section_name"] + " "
-    if metadata["doc_identifier"]:
-        doc_title += metadata["doc_identifier"] + " "
-    if metadata["policy_number"]:
-        doc_title += metadata["policy_number"] + " "
-    return doc_title
 
 
 @inject
@@ -162,10 +131,7 @@ def generate_contexts_from_docs(docs_and_scores: list[Document], query_state: Qu
     Container.logger().info(msg=f"Docs used: {num_docs_used}, tokens used: {token_counts}")
     Container.logger().info(msg=f"Doc names with relevancy scores: {query_state.used_articles_with_scores}")
 
-    doc_attributes = [
-        (x.metadata["original_filepath"], x.metadata["doc_identifier"], x.metadata["section_name"])
-        for x in docs_and_scores
-    ]
+    doc_attributes = extract_doc_attributes(docs_and_scores)
     Container.logger().info(msg=f"Doc attributes: {doc_attributes}")
     return contexts
 

@@ -5,9 +5,9 @@ scoring_model_name: gemini-1.5-pro-preview-0409
 embeddings_name: vertexai
 embeddings_model_name: textembedding-gecko@003
 vector_name: chroma
-document_retriever: custom
+document_retriever: semantic #custom is for uhg
 api_mode: stateless
-max_rounds: 1
+max_rounds: 2
 print_system_metrics: true
 temperature: 0.5
 personalization: true
@@ -16,17 +16,18 @@ use_full_documents: true
 use_relevancy_score: false
 use_mmr: false
 bq_project_id: dauren-genai-bb
-dataset_name: uhg
+dataset_name: factset # change for new project
 terraform_credentials: /home/chertushkin/terraform-service-account-credentials.json
 terraform_instance_name: talk-to-docs-instance
 terraform_redis_name: talk-to-docs-redis-instance
-gcs_source_bucket: gs://uhg_data/extractions_20240418
+# gcs_source_bucket: gs://uhg_data/extractions_20240418 # change for new project
+gcs_source_bucket: gs://factset-raw-data/extractions20240515
 similar_questions_number: 0
 MEMORY_STORE_IP: 10.151.191.44
 MAX_OUTPUT_TOKENS: 4000
 MAX_CONTEXT_SIZE: 1025000
 RETRIEVER_SCORE_THRESHOLD: 2
-PROCESSED_FILES_DIR: /mnt/resources/uhg/main_folder
+PROCESSED_FILES_DIR: /mnt/resources/{dataset_name}/main_folder
 VECTOR_STORE_PATH: gen_ai/vector_store
 USERS_FILE: /mnt/resources/users.json
 LOGS_DIRECTORY: gen_ai/logs
