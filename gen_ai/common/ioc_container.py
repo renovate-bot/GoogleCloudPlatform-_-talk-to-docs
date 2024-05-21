@@ -133,7 +133,10 @@ def provide_vector_indices(regenerate: bool = False) -> Chroma:
     embeddings: Embeddings = embeddings_provider()
 
     vector_strategy_provider = VectorStrategyProvider(vector_name)
-    vector_strategy: VectorStrategy = vector_strategy_provider(storage_interface=DefaultStorage(), vectore_store_path=vectore_store_path)
+    vector_strategy: VectorStrategy = vector_strategy_provider(
+        storage_interface=DefaultStorage(),
+        vectore_store_path=vectore_store_path
+    )
 
     local_vector_indices = {}
     return vector_strategy.get_vector_indices(regenerate, embeddings, local_vector_indices, processed_files_dir)

@@ -33,7 +33,6 @@ from typing import Any
 import json5
 from dependency_injector.wiring import inject
 from langchain.chains import LLMChain
-from langchain.schema import Document
 
 from gen_ai.common.argo_logger import create_log_snapshot
 from gen_ai.common.bq_utils import load_data_to_bq

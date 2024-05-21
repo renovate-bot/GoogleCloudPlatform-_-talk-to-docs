@@ -9,8 +9,6 @@ vector store based on semantic similarity to a provided query, potentially filte
 additional metadata criteria. It leverages similarity search and max marginal relevance
 techniques to find and rank documents according to their relevance.
 """
-
-import copy
 from abc import ABC, abstractmethod
 
 from langchain_community.vectorstores.chroma import Chroma

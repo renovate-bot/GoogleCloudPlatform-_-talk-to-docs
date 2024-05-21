@@ -177,7 +177,7 @@ def log_system_status(session_id: str) -> str:
     temperature = Container.config["temperature"]
     max_output_tokens = Container.config["MAX_OUTPUT_TOKENS"]
     pipeline_parameters = f"model: {model_name}; temperature: {temperature}; max_tokens: {max_output_tokens}"
-    
+
     comments = Container.comments
     system_state_id = str(
         uuid.uuid5(uuid.NAMESPACE_DNS, f"{git_hash}-{gcs_bucket}-{pipeline_parameters}-{comments or ''}")

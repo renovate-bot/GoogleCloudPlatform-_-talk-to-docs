@@ -44,6 +44,7 @@ from langchain.schema import Document
 
 from gen_ai.common.measure_utils import trace_on
 from gen_ai.common.ioc_container import Container
+from gen_ai.deploy.model import QueryState
 
 def get_confidence_score(question: str, answer: str) -> int:
     """Calculate confidence score for the given question-answer pair.

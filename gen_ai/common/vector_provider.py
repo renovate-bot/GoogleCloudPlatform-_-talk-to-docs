@@ -89,7 +89,9 @@ class VectorStrategy(ABC):
         self.storage_interface = storage_interface
 
     @abstractmethod
-    def get_vector_indices(self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str):
+    def get_vector_indices(
+        self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str
+    ):
         """Retrieves or creates vector indices based on the provided configuration.
 
         Args:
@@ -196,7 +198,9 @@ class ChromaVectorStrategy(VectorStrategy):
         super().__init__(storage_interface)
         self.vectore_store_path = f"{vectore_store_path}_chroma"
 
-    def get_vector_indices(self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str):
+    def get_vector_indices(
+            self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str
+    ):
         if not os.path.exists(self.vectore_store_path) or regenerate:
             if os.path.exists(self.vectore_store_path):
                 try:
@@ -335,7 +339,9 @@ class VertexAIVectorStrategy(VectorStrategy):
                 deployed_endpoints.append(deployed_endpoint)
         return deployed_endpoints
 
-    def get_vector_indices(self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str):
+    def get_vector_indices(
+            self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str
+            ):
         aiplatform.init()
         if not os.path.exists(self.vectore_store_path):
             all_jsons = self.__create(embeddings, processed_files_dir)
