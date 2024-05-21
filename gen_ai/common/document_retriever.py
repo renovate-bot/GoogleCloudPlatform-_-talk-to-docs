@@ -17,7 +17,7 @@ from langchain_community.vectorstores.chroma import Chroma
 from langchain_core.documents.base import Document
 
 import gen_ai.common.common as common
-from gen_ai.common.argo_logger import trace_on
+from gen_ai.common.measure_utils import trace_on
 from gen_ai.common.chroma_utils import convert_to_chroma_format
 from gen_ai.common.ioc_container import Container
 

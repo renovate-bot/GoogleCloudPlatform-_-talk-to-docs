@@ -30,6 +30,7 @@ from concurrent.futures import ThreadPoolExecutor
 from logging import Logger
 
 import google.auth
+import google.cloud.logging
 import redis
 from dependency_injector import containers, providers
 from google.api_core.exceptions import GoogleAPIError
@@ -44,8 +45,7 @@ import gen_ai.common.common as common
 from gen_ai.common.embeddings_provider import EmbeddingsProvider
 from gen_ai.common.exponential_retry import LLMExponentialRetryWrapper
 from gen_ai.common.storage import DefaultStorage
-from gen_ai.common.vector_provider import (VectorStrategy,
-                                           VectorStrategyProvider)
+from gen_ai.common.vector_provider import VectorStrategy, VectorStrategyProvider
 
 
 LLM_YAML_FILE = "gen_ai/llm.yaml"
@@ -72,6 +72,7 @@ def create_bq_client(project_id: str | None = None) -> bigquery.Client | None:
         print(f"Failed to create BigQuery client: {e}")
         return None
     return client
+
 
 def provide_chain(template_name: str, input_variables: list[str], output_key: str, llm: LLMChain = None) -> Chain:
     """
@@ -139,13 +140,18 @@ def provide_vector_indices(regenerate: bool = False) -> Chroma:
 
 
 def provide_logger() -> Logger:
+    client = google.cloud.logging.Client()
+    cloud_handler = client.get_default_handler()
+    formatter = logging.Formatter("%(asctime)s: %(levelname)s: %(message)s")
     stdout_handler = logging.StreamHandler(stream=sys.stdout)
-    logging.basicConfig(
-        level=logging.INFO,
-        handlers=[stdout_handler],
-        format="%(asctime)s: %(levelname)s: %(message)s",
-    )
-    return logging.getLogger()
+    stdout_handler.setFormatter(formatter)
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    logger.addHandler(cloud_handler)
+    logger.addHandler(stdout_handler)
+
+    return logger
 
 
 def provide_redis() -> redis.Redis:
@@ -224,6 +230,13 @@ class Container(containers.DeclarativeContainer):
     )
     similar_questions_chain = providers.Singleton(
         provide_chain, "similar_questions_prompt", ["question", "similar_questions_number"], "similar_questions"
+    )
+
+    previous_conversation_relevancy_chain = providers.Singleton(
+        provide_chain,
+        "previous_conversation_scoring_prompt",
+        ["previous_question", "previous_answer", "previous_additional_information_to_retrieve", "question"],
+        "text",
     )
 
     token_counter = providers.Singleton(common.provide_token_counter)
