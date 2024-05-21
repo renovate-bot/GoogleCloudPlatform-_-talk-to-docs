@@ -5,7 +5,7 @@ import os
 from collections import defaultdict
 import gen_ai.common.common as common
 
-from gen_ai.common.argo_logger import trace_on
+from gen_ai.common.measure_utils import trace_on
 import copy
 from langchain_community.vectorstores.chroma import Chroma
 from gen_ai.common.document_retriever import SemanticDocumentRetriever
