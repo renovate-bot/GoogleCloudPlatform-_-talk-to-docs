@@ -6,10 +6,8 @@ from collections import defaultdict
 import gen_ai.common.common as common
 
 from gen_ai.common.measure_utils import trace_on
-import copy
 from langchain_community.vectorstores.chroma import Chroma
 from gen_ai.common.document_retriever import SemanticDocumentRetriever
-from typing import Any
 
 
 def default_fill_query_state_with_doc_attributes(query_state: QueryState, post_filtered_docs: list[Document]) -> QueryState:
@@ -128,25 +126,6 @@ def custom_extract_doc_attributes(docs_and_scores: list[Document]) -> list[tuple
     ]
 
 
-def remove_member_and_session_id(metadata: dict[str, Any]) -> dict[str, Any]:
-    """Removes the "member_id" key and "session_id" from a metadata dictionary.
-
-    This function creates a copy of the input dictionary, deletes the "member_id" and "session_id" key from
-    the copy, and returns the modified copy.
-
-    Args:
-        metadata (dict): The input metadata dictionary.
-
-    Returns:
-        dict: A new dictionary with the "member_id" and "session_id" key removed.
-    """
-    new_metadata = copy.deepcopy(metadata)
-    if "member_id" in new_metadata:
-        del new_metadata["member_id"]
-    if "session_id" in new_metadata:
-        del new_metadata["session_id"]
-    return new_metadata
-
 class CustomStorage(Storage):
     """
     Provides a customized document storage strategy for Woolworth-specific document processing.
@@ -202,7 +181,6 @@ class CustomSemanticDocumentRetriever(SemanticDocumentRetriever):
         self, store: Chroma, questions_for_search: str, metadata: dict[str, str] | None = None
     ) -> list[Document]:
         # Very custom method
-        metadata = remove_member_and_session_id(metadata)
         if metadata is None or "set_number" not in metadata:
             custom_metadata = {"data_source": "kc"}
             return self._get_related_docs_from_store(store, questions_for_search, custom_metadata)
