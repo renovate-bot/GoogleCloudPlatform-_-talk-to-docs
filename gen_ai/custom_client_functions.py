@@ -10,8 +10,51 @@ from langchain_community.vectorstores.chroma import Chroma
 from gen_ai.common.document_retriever import SemanticDocumentRetriever
 
 
+def build_doc_title(metadata: dict[str, str]) -> str:
+    """Builds a document title using chosen behavior.
+
+    This function takes a dictionary containing various metadata fields, and
+    concatenates these values to form a document title string.
+
+    Args:
+        metadata (dict[str, str]): A dictionary with potential metadata fields.
+
+    Returns:
+        str: A concatenated string containing the document title information
+        based on the provided metadata fields.
+    """
+    return default_build_doc_title(metadata)
+
+
+def extract_doc_attributes(docs_and_scores: list[Document]) -> list[tuple[str]]:
+    """Extracts metadata attributes from a list of Document objects using chosen behavior.
+
+    Args:
+        docs_and_scores: A list of Document objects.
+
+    Returns:
+        A list of tuples where each tuple contains attributes from a Document.
+    """
+    return default_extract_doc_attributes(docs_and_scores)
+
+
+def fill_query_state_with_doc_attributes(query_state: QueryState, post_filtered_docs: list[Document]) -> QueryState:
+    """
+    Updates the provided query_state object with attributes extracted from documents using chosen behavior.
+
+    Args:
+        query_state: The QueryState object to be modified.
+        post_filtered_docs: A list of Document objects containing metadata.
+
+    Returns:
+        The modified QueryState object, with custom_fields updated based on document metadata.
+    """
+    return default_fill_query_state_with_doc_attributes(query_state, post_filtered_docs)
+
+
 def default_fill_query_state_with_doc_attributes(query_state: QueryState, post_filtered_docs: list[Document]) -> QueryState:
-    """Updates the provided query_state object with attributes extracted from documents after filtering.
+    """
+    Updates the provided query_state object with attributes extracted from documents after filtering.
 
     This function iterates through each document in the `post_filtered_docs` list.  For each key-value pair in a document's metadata, it adds the value to the corresponding list in the `custom_fields` field of the `query_state`. If the key doesn't exist yet, a new list is created.
 
@@ -232,7 +275,3 @@ def default_build_doc_title(metadata: dict[str, str]) -> str:
     if metadata.get("symbols"):
         doc_title += metadata["symbols"] + " "
     return doc_title
-
-build_doc_title = default_build_doc_title
-extract_doc_attributes = default_extract_doc_attributes
-fill_query_state_with_doc_attributes = default_fill_query_state_with_doc_attributes
