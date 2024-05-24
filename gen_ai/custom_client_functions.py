@@ -1,13 +1,15 @@
-from gen_ai.deploy.model import QueryState
-from langchain.schema import Document
-from gen_ai.common.storage import Storage
+import copy
 import os
 from collections import defaultdict
-import gen_ai.common.common as common
 
-from gen_ai.common.measure_utils import trace_on
+from langchain.schema import Document
 from langchain_community.vectorstores.chroma import Chroma
+
+import gen_ai.common.common as common
 from gen_ai.common.document_retriever import SemanticDocumentRetriever
+from gen_ai.common.measure_utils import trace_on
+from gen_ai.common.storage import Storage
+from gen_ai.deploy.model import QueryState
 
 
 def build_doc_title(metadata: dict[str, str]) -> str:
