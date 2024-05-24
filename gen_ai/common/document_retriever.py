@@ -20,6 +20,26 @@ from gen_ai.common.chroma_utils import convert_to_chroma_format
 from gen_ai.common.ioc_container import Container
 
 
+def remove_member_and_session_id(metadata: dict[str, Any]) -> dict[str, Any]:
+    """Removes the "member_id" key and "session_id" from a metadata dictionary.
+
+    This function creates a copy of the input dictionary, deletes the "member_id" and "session_id" key from
+    the copy, and returns the modified copy.
+
+    Args:
+        metadata (dict): The input metadata dictionary.
+
+    Returns:
+        dict: A new dictionary with the "member_id" and "session_id" key removed.
+    """
+    new_metadata = copy.deepcopy(metadata)
+    if "member_id" in new_metadata:
+        del new_metadata["member_id"]
+    if "session_id" in new_metadata:
+        del new_metadata["session_id"]
+    return new_metadata
+
+
 class DocumentRetriever(ABC):
     """
     Abstract base class for retrieving documents from a document store based on certain criteria.
@@ -56,26 +76,6 @@ class DocumentRetriever(ABC):
             documents.extend(self.get_related_docs_from_store(store, question, metadata))
         documents = common.remove_duplicates(documents)
         return documents
-
-
-def remove_member_and_session_id(metadata: dict[str, Any]) -> dict[str, Any]:
-    """Removes the "member_id" key and "session_id" from a metadata dictionary.
-
-    This function creates a copy of the input dictionary, deletes the "member_id" and "session_id" key from
-    the copy, and returns the modified copy.
-
-    Args:
-        metadata (dict): The input metadata dictionary.
-
-    Returns:
-        dict: A new dictionary with the "member_id" and "session_id" key removed.
-    """
-    new_metadata = copy.deepcopy(metadata)
-    if "member_id" in new_metadata:
-        del new_metadata["member_id"]
-    if "session_id" in new_metadata:
-        del new_metadata["session_id"]
-    return new_metadata
 
 
 class SemanticDocumentRetriever(DocumentRetriever):
