@@ -103,12 +103,15 @@ class SemanticDocumentRetriever(DocumentRetriever):
             metadata = convert_to_chroma_format(metadata)
 
         ss_docs = store.similarity_search_with_score(query=questions_for_search, k=50, filter=metadata)
-        ss_docs = [x[0] for x in ss_docs[0:3]]
+        max_number_of_docs_retrieved = Container.config.get("max_number_of_docs_retrieved", 3)
+        ss_docs = [x[0] for x in ss_docs[0:max_number_of_docs_retrieved]]
 
         if Container.config.get("use_mmr", False):
             mmr_docs = store.max_marginal_relevance_search(
-                query=questions_for_search, k=1, lambda_mult=0.5, filter=metadata
+                query=questions_for_search, k=50, lambda_mult=0.5, filter=metadata
             )
+            max_number_of_docs_retrieved_mmr = Container.config.get("max_number_of_docs_retrieved_mmr", 3)
+            mmr_docs = mmr_docs[0:max_number_of_docs_retrieved_mmr]
         else:
             mmr_docs = []
         docs = common.remove_duplicates(ss_docs + mmr_docs)

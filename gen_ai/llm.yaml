@@ -33,6 +33,8 @@ users_file: /mnt/resources/users.json
 logs_directory: gen_ai/logs
 previous_conversations_number: 2
 previous_conversation_score_threshold: 2
+max_number_of_docs_retrieved: 3
+max_number_of_docs_retrieved_mmr: 3
 
 is_debug: false
 gradio_root_path: /t2x-mig-ui
