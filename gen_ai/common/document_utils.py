@@ -133,7 +133,7 @@ def generate_contexts_from_docs(docs_and_scores: list[Document], query_state: Qu
     token_counts = [0]
     used_articles = []
     token_counter: TokenCounter = Container.token_counter()
-    max_context_size = Container.config.get("max_context_size", 30000)
+    max_context_size = Container.config.get("max_context_size", 1000000)
 
     for doc in docs_and_scores:
         filename = doc.metadata["section_name"]
