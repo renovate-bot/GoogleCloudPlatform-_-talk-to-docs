@@ -448,8 +448,7 @@ def summarize_and_score_documents(
           accessed using the key `'relevancy_score'`.
     """
     print("Docs used before summary/scoring: ", len(docs_and_scores))
-    if threshold is None:
-        threshold = Container.config.get("retriever_score_threshold", 2)
+    threshold = threshold or Container.config.get("retriever_score_threshold", 2)
     docs_and_scores = summarize_retrieved_documents(docs_and_scores, question)
     docs_and_scores = score_retrieved_documents(docs_and_scores, question)
     if Container.debug_info:
