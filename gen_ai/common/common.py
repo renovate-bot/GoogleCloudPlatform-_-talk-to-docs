@@ -119,7 +119,7 @@ def get_or_create_model(model_name: str) -> BaseChatModel:
     config = load_yaml(LLM_YAML_FILE)
     temperature = config.get("temperature", 0.001)
     max_output_tokens = config.get("max_output_tokens", 4000)
-    if "unicorn" in model_name or "gemini" in model_name:
+    if "gemini" in model_name or "unicorn" in model_name:
         llms[model_name] = VertexAI(model_name=model_name, temperature=temperature, max_output_tokens=max_output_tokens)
         return llms[model_name]
     elif "chat-bison" in model_name or "text-bison" in model_name:
