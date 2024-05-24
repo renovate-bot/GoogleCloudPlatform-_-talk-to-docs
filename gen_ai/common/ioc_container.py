@@ -125,8 +125,8 @@ def provide_vector_indices(regenerate: bool = False) -> Chroma:
     embeddings_model_name = config.get("embeddings_model_name")
     vector_name = config.get("vector_name")
     dataset_name = config.get("dataset_name")
-    processed_files_dir = config.get("PROCESSED_FILES_DIR").format(dataset_name=dataset_name)
-    vectore_store_path = config.get("VECTOR_STORE_PATH")
+    processed_files_dir = config.get("processed_files_dir").format(dataset_name=dataset_name)
+    vectore_store_path = config.get("vector_store_path")
 
     embeddings_provider = EmbeddingsProvider(embeddings_name, embeddings_model_name)
     embeddings: Embeddings = embeddings_provider()
@@ -160,14 +160,14 @@ def provide_redis() -> redis.Redis:
     """
     Provides a Redis database connection using predefined settings.
 
-    This function initializes and returns a connection to a Redis database specified by the MEMORY_STORE_IP constant.
+    This function initializes and returns a connection to a Redis database specified by the memory_store_ip constant.
     It sets up the connection with the default port and database index.
 
     Returns:
         redis.Redis: A Redis client instance connected to the specified Redis server.
     """
     config = common.load_yaml(LLM_YAML_FILE)
-    memory_store_ip = config.get("MEMORY_STORE_IP")
+    memory_store_ip = config.get("memory_store_ip")
     redis_db = redis.Redis(host=memory_store_ip, port=6379, db=0, decode_responses=True)
     return redis_db
 

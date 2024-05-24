@@ -101,7 +101,7 @@ def log_interim_state(
     date_time = conversation.date_time
     username = conversation.user
     exchange_num = len(conversation.exchanges)
-    logs_directory = Container.config.get("LOGS_DIRECTORY", "gen_ai/logs")
+    logs_directory = Container.config.get("logs_directory", "gen_ai/logs")
     with open(
         f"{logs_directory}/{username}__{conversation_num}__{date_time}__interim__{exchange_num}.json",
         "a",
@@ -144,7 +144,7 @@ def feedback(
 
     conversation_num = conversation.conversation_num
     date_time = conversation.date_time
-    logs_directory = Container.config.get("LOGS_DIRECTORY", "gen_ai/logs")
+    logs_directory = Container.config.get("logs_directory", "gen_ai/logs")
     with open(
         f"{logs_directory}/{request.username}__{conversation_num}__{date_time}.json",
         "a",
@@ -198,7 +198,7 @@ def authenticate(username, password):
     default_auth_users = {
         gradio_user: gradio_password,
     }
-    users_file_path = Container.config.get("USERS_FILE", False)
+    users_file_path = Container.config.get("users_file", False)
     auth_users = {}
     if os.path.isfile(users_file_path):
         with open(users_file_path, "r", encoding="utf-8") as users_file:
@@ -222,7 +222,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Gradio app for LLM Chatbot.")
     parser.add_argument("--use_ft", action="store_true", help="Use fine-tuned model")
     args = parser.parse_args()
-    logs_directory = Container.config.get("LOGS_DIRECTORY", "gen_ai/logs")
+    logs_directory = Container.config.get("logs_directory", "gen_ai/logs")
 
     if not os.path.exists(logs_directory):
         os.makedirs(logs_directory)

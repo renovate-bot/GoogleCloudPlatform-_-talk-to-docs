@@ -23,14 +23,14 @@ terraform_redis_name: talk-to-docs-redis-instance
 # gcs_source_bucket: gs://uhg_data/extractions_20240418 # change for new project
 gcs_source_bucket: gs://factset-raw-data/extractions20240515
 similar_questions_number: 0
-MEMORY_STORE_IP: 10.151.191.44
-MAX_OUTPUT_TOKENS: 4000
-MAX_CONTEXT_SIZE: 1025000
-RETRIEVER_SCORE_THRESHOLD: 2
-PROCESSED_FILES_DIR: /mnt/resources/{dataset_name}/main_folder
-VECTOR_STORE_PATH: gen_ai/vector_store
-USERS_FILE: /mnt/resources/users.json
-LOGS_DIRECTORY: gen_ai/logs
+MEMORY_STORE_IP: 10.151.191.44 # change to your redis IP
+max_output_tokens: 4000
+max_context_size: 1025000
+retriever_score_threshold: 2
+processed_files_dir: /mnt/resources/{dataset_name}/main_folder
+vector_store_path: gen_ai/vector_store
+users_file: /mnt/resources/users.json
+logs_directory: gen_ai/logs
 previous_conversations_number: 2
 previous_conversation_score_threshold: 2
 

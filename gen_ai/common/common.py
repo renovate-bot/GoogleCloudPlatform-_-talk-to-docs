@@ -118,7 +118,7 @@ def get_or_create_model(model_name: str) -> BaseChatModel:
         return llms[model_name]
     config = load_yaml(LLM_YAML_FILE)
     temperature = config.get("temperature", 0.001)
-    max_output_tokens = config.get("MAX_OUTPUT_TOKENS", 4000)
+    max_output_tokens = config.get("max_output_tokens", 4000)
     if "gpt-3.5" in model_name or "gpt-4" in model_name:
         llms[model_name] = ChatOpenAI(model_name=model_name, temperature=temperature)
         return llms[model_name]
