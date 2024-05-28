@@ -44,8 +44,6 @@ THEME_HUE = gr.themes.Color(
     "UHG",
 )
 
-LOGO = "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/UnitedHealth_Group_logo.svg/444px-UnitedHealth_Group_logo.svg.png"
-
 # Predict function
 def predict(conversation: Conversation, input_query, input_metadata, request: gr.Request):
     if not input_query:
@@ -190,6 +188,7 @@ def feedback(
 
 def authenticate(username, password):
     # Default user and password, stored in .env file (not commited to github)
+    return True
     gradio_user = os.getenv("gradio_user")
     gradio_password = os.getenv("gradio_password")
     if gradio_user is None or gradio_password is None:
@@ -223,6 +222,8 @@ if __name__ == "__main__":
     parser.add_argument("--use_ft", action="store_true", help="Use fine-tuned model")
     args = parser.parse_args()
     logs_directory = Container.config.get("logs_directory", "gen_ai/logs")
+    customer_logo = Container.config.get("customer_logo")
+    customer_name = Container.config.get("customer_name", "Customer")
 
     if not os.path.exists(logs_directory):
         os.makedirs(logs_directory)
@@ -240,7 +241,7 @@ if __name__ == "__main__":
         session_conversation = gr.State(Conversation(exchanges=[]))
 
         # Title of the app (goes in <head> tag of the page source)
-        gradio_app.title = f"Customer Advocate Assistant"
+        gradio_app.title = f"{customer_name} Assistant"
 
         # App's <body> starts here
         with gr.Row(elem_id="title_row", equal_height=True):
@@ -255,7 +256,7 @@ if __name__ == "__main__":
                 gr.HTML(
                     f"""
                     <div style='display: flex; align-items: center; justify-content: center; width: 100%;'>
-                        <h1>Customer Advocate Assistant</h1>
+                        <h1>{customer_name} Assistant</h1>
                     </div>
                     """
                 )
@@ -263,7 +264,7 @@ if __name__ == "__main__":
                 gr.HTML(
                     f"""
                     <div style='display: flex; align-items: center; justify-content: flex-end; width: 100%;'>
-                        <img src='{LOGO}' 
+                        <img src='{customer_logo}' 
                             alt='Logo' style='max-height:50px; transform: scale(0.7);'>
                     </div>
                     """
@@ -286,9 +287,9 @@ if __name__ == "__main__":
 
                 with gr.Row():
                     metadata_box = gr.Textbox(
-                        label="Optional. Enter the set number. Example: ACIS001",
+                        label="Optional. Input personalization info",
                         lines=1,
-                        placeholder="Input set number",
+                        placeholder="Input personalization info",
                     )
 
             with gr.Column(scale=1):
@@ -413,13 +414,11 @@ if __name__ == "__main__":
         # Examples for the chatbot
         gr.Examples(
             [
-                ["I injured my back. Is massage therapy covered?"],
-                ["I am traveling to Europe on vacation. Do I have coverage if I need to seek medical treatment?"],
-                ["Is acupuncture a covered service?"],
-                ["Do I have a copay for a routine colonoscopy?"],
-                ["Can my partner be covered under my plan?"],
-                ["Now that I've lost my employment, will my dependents be covered under COBRA?"],
-                ["What is the effective date of my current coverage?"],
+                ["What are Verizon's top operating expenses?"],
+                ["What industry does AMCOR primarily operate in?"],
+                ["Locate information on partnerships or collaborations announced by Paramount."],
+                ["What are the key trends impacting costs for davita?"],
+                ["Does Foot Locker's new CEO have previous CEO experience in a similar company to Footlocker?"]
             ],
             inputs=prompt_box,
             outputs=chatbot,

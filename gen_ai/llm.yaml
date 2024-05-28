@@ -34,7 +34,9 @@ previous_conversations_number: 2
 previous_conversation_score_threshold: 2
 max_number_of_docs_retrieved: 3
 use_mmr: false
-max_number_of_docs_retrieved_mmr: 0
+max_number_of_docs_retrieved_mmr: 3
+customer_name: Customer
+customer_logo: https://www.gstatic.com/pantheon/images/welcome/supercloud.svg
 
 is_debug: false
 gradio_root_path: /t2x-mig-ui
