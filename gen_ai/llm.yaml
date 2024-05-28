@@ -6,7 +6,7 @@ embeddings_name: vertexai
 embeddings_model_name: textembedding-gecko@003
 vector_name: chroma
 document_retriever: semantic #custom is for uhg
-api_mode: stateful
+api_mode: stateless
 max_rounds: 2
 print_system_metrics: true
 temperature: 0.5
@@ -14,7 +14,6 @@ personalization: true
 debug_info: false
 use_full_documents: true
 use_relevancy_score: false
-use_mmr: false
 bq_project_id: dauren-genai-bb
 dataset_name: factset # change for new project
 terraform_credentials: /home/chertushkin/terraform-service-account-credentials.json
@@ -34,6 +33,7 @@ logs_directory: gen_ai/logs
 previous_conversations_number: 2
 previous_conversation_score_threshold: 2
 max_number_of_docs_retrieved: 3
+use_mmr: true
 max_number_of_docs_retrieved_mmr: 3
 
 is_debug: false
