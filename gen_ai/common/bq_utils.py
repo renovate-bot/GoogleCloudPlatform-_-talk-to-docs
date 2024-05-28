@@ -339,13 +339,13 @@ class BigQueryConverter:
             response = query_state.answer or ""
             retrieved_documents_so_far = json.dumps(
                 [
-                    {"original_filepath": x["metadata"].get("original_filepath")} 
+                    {"original_filepath": x["metadata"].get("original_filepath")}
                     for x in log_snapshot["pre_filtered_docs"]
                 ]
             )
             post_filtered_documents_so_far = json.dumps(
                 [
-                    {"original_filepath": x["metadata"].get("original_filepath")} 
+                    {"original_filepath": x["metadata"].get("original_filepath")}
                     for x in log_snapshot["post_filtered_docs"]
                 ]
             )
