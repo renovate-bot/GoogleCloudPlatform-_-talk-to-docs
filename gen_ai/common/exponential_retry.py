@@ -110,15 +110,18 @@ def concurrent_best_reduce(num_calls):
     """
     Decorator to run a function concurrently multiple times and return the best result.
 
-    This decorator enhances a function by executing it concurrently across multiple threads, using a ThreadPoolExecutor.
-    The results from all concurrent executions are compared based on a specified metric (assumed to be the second element of the return tuple),
+    This decorator enhances a function by executing it concurrently across multiple threads, 
+    using a ThreadPoolExecutor.
+    The results from all concurrent executions are compared based on a specified metric (assumed to be the second 
+    element of the return tuple),
     and the best result (highest score according to the metric) is returned.
 
     Args:
         num_calls: The number of times to concurrently execute the wrapped function.
 
     Returns:
-        Callable: A decorated version of the input function that performs concurrent execution and returns the best result.
+        Callable: A decorated version of the input function that performs concurrent execution and returns the best 
+        result.
 
     Example:
         @concurrent_best_reduce(num_calls=3)
