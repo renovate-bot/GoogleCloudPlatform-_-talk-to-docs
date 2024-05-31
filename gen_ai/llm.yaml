@@ -19,10 +19,9 @@ dataset_name: factset # change for new project
 terraform_credentials: /home/chertushkin/terraform-service-account-credentials.json
 terraform_instance_name: talk-to-docs-instance
 terraform_redis_name: talk-to-docs-redis-instance
-# gcs_source_bucket: gs://uhg_data/extractions_20240418 # change for new project
-gcs_source_bucket: gs://factset-raw-data/extractions20240515
+gcs_source_bucket: gs://uhg_data/extractions_20240418 # change for new project
 similar_questions_number: 0
-MEMORY_STORE_IP: 10.151.191.44 # change to your redis IP
+memory_store_ip: 10.151.191.44 # change to your redis IP
 max_output_tokens: 4000
 max_context_size: 1025000
 retriever_score_threshold: 2
