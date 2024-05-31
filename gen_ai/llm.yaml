@@ -1,5 +1,21 @@
 # This file defines the LLM prompts and configuration parameters used
 # to converse with a user.
+# Project and User specific configuration
+bq_project_id: dauren-genai-bb # change for the user's project id
+dataset_name: uhg # change for new project
+gcs_source_bucket: gs://uhg_data/extractions_20240418 # change for new project
+terraform_credentials: /home/chertushkin/terraform-service-account-credentials.json # change for the user
+terraform_instance_name: talk-to-docs-instance
+terraform_redis_name: talk-to-docs-redis-instance
+memory_store_ip: 10.151.191.44 # change to your redis IP
+customer_name: Customer # change for new project
+customer_logo: https://www.gstatic.com/pantheon/images/welcome/supercloud.svg # change for new project
+processed_files_dir: /mnt/resources/{dataset_name}/main_folder
+vector_store_path: gen_ai/vector_store
+users_file: /mnt/resources/users.json
+logs_directory: gen_ai/logs
+gradio_root_path: /t2x-mig-ui
+# Technical configuration
 model_name: gemini-1.5-pro-preview-0409
 scoring_model_name: gemini-1.5-pro-preview-0409
 embeddings_name: vertexai
@@ -7,38 +23,23 @@ embeddings_model_name: textembedding-gecko@003
 vector_name: chroma
 document_retriever: semantic #custom is for uhg
 api_mode: stateless
-max_rounds: 2
-print_system_metrics: true
-temperature: 0.5
 personalization: true
-debug_info: false
-use_full_documents: true
-use_relevancy_score: false
-bq_project_id: dauren-genai-bb
-dataset_name: factset # change for new project
-terraform_credentials: /home/chertushkin/terraform-service-account-credentials.json
-terraform_instance_name: talk-to-docs-instance
-terraform_redis_name: talk-to-docs-redis-instance
-gcs_source_bucket: gs://uhg_data/extractions_20240418 # change for new project
-similar_questions_number: 0
-memory_store_ip: 10.151.191.44 # change to your redis IP
+temperature: 0.5
 max_output_tokens: 4000
 max_context_size: 1025000
+max_rounds: 2
+similar_questions_number: 0
+use_full_documents: true
+use_relevancy_score: false
 retriever_score_threshold: 2
-processed_files_dir: /mnt/resources/{dataset_name}/main_folder
-vector_store_path: gen_ai/vector_store
-users_file: /mnt/resources/users.json
-logs_directory: gen_ai/logs
-previous_conversations_number: 2
-previous_conversation_score_threshold: 2
 max_number_of_docs_retrieved: 3
 use_mmr: false
 max_number_of_docs_retrieved_mmr: 3
-customer_name: Customer
-customer_logo: https://www.gstatic.com/pantheon/images/welcome/supercloud.svg
-
+previous_conversations_number: 2
+previous_conversation_score_threshold: 2
 is_debug: false
-gradio_root_path: /t2x-mig-ui
+print_system_metrics: true
+debug_info: false
 
 previous_conversation_scoring_prompt: |
   You are an expert relevance evaluator tasked with determining how relevant a previous conversation is to a specific question. Your evaluation must be provided in a JSON format. Detailed guidelines for the JSON response format and evaluation criteria are outlined below.
