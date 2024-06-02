@@ -28,6 +28,11 @@ from langchain.vectorstores import Chroma
 from gen_ai.common.common import default_extract_data
 from gen_ai.common.inverted_index import InvertedIndex
 from gen_ai.common.storage import Storage
+from typing import List
+
+from google.api_core.client_options import ClientOptions
+from google.cloud import discoveryengine_v1 as discoveryengine
+
 
 @dataclass
 class DeployedEndpoint:
@@ -165,6 +170,95 @@ class VertexVectorStore(VectorStore):
         return self.similarity_search(query, k, **kwargs)
 
 
+class VertexAISearchVectorStore(VectorStore):
+    """Concrete implementation of VectorStore using Vertex AI Search for vector storage and search.
+    # Important: VAIS (VertexAIVectorStore) and VVS (VertexVectorStore) are DIFFERENT THINGS
+    Attributes:
+        chroma (Chroma): The Chroma instance for managing the vector store.
+    """
+
+    def __init__(self):
+        self.project_id = "chertushkin-genai-sa"
+        self.location = "global"
+        self.engine_id = "uhg_1715558830222"
+
+    def _search_sample(
+        self,
+        project_id: str,
+        location: str,
+        engine_id: str,
+        search_query: str,
+        k: int = 4,
+    ) -> List[discoveryengine.SearchResponse]:
+        client_options = (
+            ClientOptions(api_endpoint=f"{location}-discoveryengine.googleapis.com") if location != "global" else None
+        )
+
+        client = discoveryengine.SearchServiceClient(client_options=client_options)
+
+        serving_config = f"projects/{project_id}/locations/{location}/collections/default_collection/engines/{engine_id}/servingConfigs/default_config"
+
+        content_search_spec = discoveryengine.SearchRequest.ContentSearchSpec(
+            snippet_spec=discoveryengine.SearchRequest.ContentSearchSpec.SnippetSpec(return_snippet=True),
+            summary_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec(
+                summary_result_count=10,
+                include_citations=True,
+                ignore_adversarial_query=True,
+                ignore_non_summary_seeking_query=True,
+                model_prompt_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec.ModelPromptSpec(
+                    preamble="Here is the question"
+                ),
+                model_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec.ModelSpec(
+                    version="stable",
+                ),
+            ),
+        )
+
+        request = discoveryengine.SearchRequest(
+            serving_config=serving_config,
+            query=search_query,
+            page_size=10,
+            content_search_spec=content_search_spec,
+            query_expansion_spec=discoveryengine.SearchRequest.QueryExpansionSpec(
+                condition=discoveryengine.SearchRequest.QueryExpansionSpec.Condition.AUTO,
+            ),
+            spell_correction_spec=discoveryengine.SearchRequest.SpellCorrectionSpec(
+                mode=discoveryengine.SearchRequest.SpellCorrectionSpec.Mode.AUTO
+            ),
+        )
+
+        response = client.search(request)
+        ls = response.results  # [2]
+        docs = []
+        for item in ls:
+            content = item.document.derived_struct_data["snippets"][0]["snippet"]
+            doc = Document(page_content=content)
+            doc.metadata = {
+                "original_filepath": item.document.derived_struct_data["title"],
+                "section_name": item.document.derived_struct_data["title"],
+            }
+            docs.append((doc, 1.0))
+        return docs
+
+    def similarity_search_with_score(self, query: str, k: int = 4, **kwargs):
+
+        return self._search_sample(
+            project_id=self.project_id,
+            location=self.location,
+            engine_id=self.engine_id,
+            search_query=query,
+            k=k,
+        )
+
+    def similarity_search(self, query: str, k: int = 4, **kwargs):
+        return self.similarity_search_with_score(query, k)
+
+    def max_marginal_relevance_search(
+        self, query: str, k: int = 4, fetch_k: int = 20, lambda_mult: float = 0.5, **kwargs
+    ):
+        return self.similarity_search_with_score(query, k)
+
+
 class VectorStrategyProvider:
     """Factory class for selecting the appropriate VectorStrategy implementation."""
 
@@ -187,6 +281,8 @@ class VectorStrategyProvider:
             return VertexAIVectorStrategy(**kwargs)
         elif "chroma" in self.vector_name:
             return ChromaVectorStrategy(**kwargs)
+        elif "vais" in self.vector_name:
+            return VertexAISearchVectorStrategy(**kwargs)
         else:
             raise ValueError("Not supported embeddings name in config")
 
@@ -199,7 +295,7 @@ class ChromaVectorStrategy(VectorStrategy):
         self.vectore_store_path = f"{vectore_store_path}_chroma"
 
     def get_vector_indices(
-            self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str
+        self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str
     ):
         if not os.path.exists(self.vectore_store_path) or regenerate:
             if os.path.exists(self.vectore_store_path):
@@ -217,6 +313,19 @@ class ChromaVectorStrategy(VectorStrategy):
             vector_indices = plan_store
 
         return vector_indices
+
+
+class VertexAISearchVectorStrategy(VectorStrategy):
+    """Concrete implementation of VectorStrategy for using Vertex AI Search as the vector store."""
+
+    def __init__(self, storage_interface: Storage, vectore_store_path: str) -> None:
+        super().__init__(storage_interface)
+        self.vectore_store_path = f"{vectore_store_path}_vais"
+
+    def get_vector_indices(
+        self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str
+    ):
+        return VertexAISearchVectorStore()
 
 
 class VertexAIVectorStrategy(VectorStrategy):
@@ -340,8 +449,8 @@ class VertexAIVectorStrategy(VectorStrategy):
         return deployed_endpoints
 
     def get_vector_indices(
-            self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str
-            ):
+        self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str
+    ):
         aiplatform.init()
         if not os.path.exists(self.vectore_store_path):
             all_jsons = self.__create(embeddings, processed_files_dir)

@@ -20,7 +20,7 @@ model_name: gemini-1.5-pro-preview-0409
 scoring_model_name: gemini-1.5-pro-preview-0409
 embeddings_name: vertexai
 embeddings_model_name: textembedding-gecko@003
-vector_name: chroma
+vector_name: vais
 document_retriever: semantic #custom is for uhg
 api_mode: stateless
 personalization: true
