@@ -24,6 +24,7 @@ gcs_source_bucket: gs://uhg_data/extractions_20240418
 similar_questions_number: 0
 previous_conversations_number: 2
 previous_conversation_score_threshold: 2
+parallel_main_llm_calls: 5
 
 is_debug: false
 gradio_root_path: /t2x-mig-ui
