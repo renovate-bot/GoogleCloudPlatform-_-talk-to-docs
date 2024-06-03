@@ -2,13 +2,13 @@
 # to converse with a user.
 # Project and User specific configuration
 bq_project_id: dauren-genai-bb # change for the user's project id
-dataset_name: uhg # change for new project
-gcs_source_bucket: gs://uhg_data/extractions_20240418 # change for new project
-terraform_credentials: /home/chertushkin/terraform-service-account-credentials.json # change for the user
+dataset_name: dataset_name # change for new project
+gcs_source_bucket: gs://bucket location # change for new project
+terraform_credentials: terraform-service-account-credentials.json # change for the user
 terraform_instance_name: talk-to-docs-instance
 terraform_redis_name: talk-to-docs-redis-instance
 memory_store_ip: 10.151.191.44 # change to your redis IP
-customer_name: Customer # change for new project
+customer_name: Customer # change for new project (gradio)
 customer_logo: https://www.gstatic.com/pantheon/images/welcome/supercloud.svg # change for new project
 processed_files_dir: /mnt/resources/{dataset_name}/main_folder
 vector_store_path: gen_ai/vector_store
@@ -21,7 +21,7 @@ scoring_model_name: gemini-1.5-pro-preview-0409
 embeddings_name: vertexai
 embeddings_model_name: textembedding-gecko@003
 vector_name: chroma
-document_retriever: semantic #custom is for uhg
+document_retriever: semantic #custom is for custom use case
 api_mode: stateless
 personalization: true
 temperature: 0.5

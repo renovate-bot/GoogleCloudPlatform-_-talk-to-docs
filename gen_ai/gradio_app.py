@@ -41,7 +41,6 @@ THEME_HUE = gr.themes.Color(
     "#0D2E4A",
     "#071927",
     "#030B11",
-    "UHG",
 )
 
 # Predict function
