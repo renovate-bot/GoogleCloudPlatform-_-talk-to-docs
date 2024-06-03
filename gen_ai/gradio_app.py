@@ -188,7 +188,6 @@ def feedback(
 
 def authenticate(username, password):
     # Default user and password, stored in .env file (not commited to github)
-    return True
     gradio_user = os.getenv("gradio_user")
     gradio_password = os.getenv("gradio_password")
     if gradio_user is None or gradio_password is None:
