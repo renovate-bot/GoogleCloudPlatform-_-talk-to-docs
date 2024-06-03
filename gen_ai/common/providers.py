@@ -6,8 +6,7 @@ retriever based on a given criterion (e.g., semantic analysis) and the abstract 
 """
 
 from gen_ai.common.document_retriever import SemanticDocumentRetriever
-from gen_ai.custom_client_functions import CustomSemanticDocumentRetriever, CustomStorage
-from gen_ai.common.storage import DefaultStorage
+from gen_ai.custom_client_functions import CustomSemanticDocumentRetriever
 
 
 class DocumentRetrieverProvider:
