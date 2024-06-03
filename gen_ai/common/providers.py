@@ -18,13 +18,3 @@ class DocumentRetrieverProvider:
             return CustomSemanticDocumentRetriever()
         else:
             raise ValueError("Not implemented document retriver")
-
-
-class StorageProvider:
-    def __call__(self, name: str) -> "Storage":
-        if name == "default":
-            return DefaultStorage()
-        elif name == "custom":
-            return CustomStorage()
-        else:
-            raise ValueError("Not implemented storage")
