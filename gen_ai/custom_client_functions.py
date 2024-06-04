@@ -196,7 +196,7 @@ class CustomStorage(Storage):
     is uniform and predefined.
     """
 
-    def process_directory(self, content_dir: str, custom_extract_data: callable) -> dict[str, list[Document]]:
+    def process_directory(self, content_dir: str, extract_data_fn: callable) -> dict[str, list[Document]]:
         """
         Go through files in content_dir and parse their content if the filename ends with ".txt".
         Generate a document object from each file and store it in a hashmap where the key is the
@@ -210,7 +210,7 @@ class CustomStorage(Storage):
                 file_path = os.path.join(content_dir, filename)
                 with open(file_path, "r", encoding="utf-8") as f:
                     content = f.read()
-                document = custom_extract_data(content)
+                document = extract_data_fn(content)
                 filename_metadata = file_path.replace(".txt", "_metadata.json")
                 metadata = common.read_json(filename_metadata)
                 for k, v in metadata.items():
