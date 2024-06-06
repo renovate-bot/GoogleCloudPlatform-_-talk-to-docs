@@ -48,6 +48,7 @@ class PersonalizedData(BaseModel):
     agent_name: str = ""
     set_number: str = ""
     policy_number: str = ""
+    session_id: str = ""
 
 
 class ItemInput(BaseModel):
