@@ -88,4 +88,4 @@ python gen_ai/copy_resources.py
 
 ### Updating BigQuery table
 
-It is currently set up that all the runs are logged into "uhg" dataset in "chertushkin-genai-sa" project. To change the project id - change `bq_project_id` field of `llm.yaml` file. If you receive an error in logging, check if the service account is added to BigQuery IAM of "chertushkin-genai-sa" project. Or whatever the project you specified in the config.
+It is currently set up that all the runs are logged into "dataset_name" dataset in "chertushkin-genai-sa" project. To change the project id - change `bq_project_id` field of `llm.yaml` file. If you receive an error in logging, check if the service account is added to BigQuery IAM of "chertushkin-genai-sa" project. Or whatever the project you specified in the config.
