@@ -1,33 +1,47 @@
 # This file defines the LLM prompts and configuration parameters used
 # to converse with a user.
+# Project and User specific configuration
+bq_project_id: dauren-genai-bb # change for the user's project id
+dataset_name: dataset_name # change for new project
+gcs_source_bucket: gs://bucket location # change for new project
+terraform_credentials: terraform-service-account-credentials.json # change for the user
+terraform_instance_name: talk-to-docs-instance
+terraform_redis_name: talk-to-docs-redis-instance
+memory_store_ip: 10.151.191.44 # change to your redis IP
+customer_name: Customer # change for new project (gradio)
+customer_logo: https://www.gstatic.com/pantheon/images/welcome/supercloud.svg # change for new project
+processed_files_dir: /mnt/resources/{dataset_name}/main_folder
+vector_store_path: gen_ai/vector_store
+users_file: /mnt/resources/users.json
+logs_directory: gen_ai/logs
+gradio_root_path: /t2x-mig-ui
+# Technical configuration
 model_name: gemini-1.5-flash-preview-0514
 scoring_model_name: gemini-1.5-flash-preview-0514
 embeddings_name: vertexai
 embeddings_model_name: textembedding-gecko@003
 vector_name: chroma
-document_retriever: semantic
-api_mode: stateful
-max_rounds: 1
-print_system_metrics: true
-temperature: 0.5
+document_retriever: semantic #custom is for custom use case
+api_mode: stateless
 personalization: true
-debug_info: false
+temperature: 0.5
+max_output_tokens: 4000
+max_context_size: 1025000
+max_rounds: 2
+similar_questions_number: 0
 use_full_documents: true
 use_relevancy_score: false
+retriever_score_threshold: 2
+max_number_of_docs_retrieved: 3
 use_mmr: false
-bq_project_id: chertushkin-genai-sa
-dataset_name: uhg
-terraform_credentials: /home/chertushkin/terraform-service-account-credentials.json
-terraform_instance_name: talk-to-docs-instance
-terraform_redis_name: talk-to-docs-redis-instance
-gcs_source_bucket: gs://uhg_data/extractions_20240418
-similar_questions_number: 0
+max_number_of_docs_retrieved_mmr: 3
 previous_conversations_number: 2
 previous_conversation_score_threshold: 2
 parallel_main_llm_calls: 5
 
 is_debug: false
-gradio_root_path: /t2x-mig-ui
+print_system_metrics: true
+debug_info: false
 
 previous_conversation_scoring_prompt: |
   You are an expert relevance evaluator tasked with determining how relevant a previous conversation is to a specific question. Your evaluation must be provided in a JSON format. Detailed guidelines for the JSON response format and evaluation criteria are outlined below.

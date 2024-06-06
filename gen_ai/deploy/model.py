@@ -160,9 +160,7 @@ class QueryState:
         additional_information_to_retrieve: Any additional information that needs to be retrieved.
         time_taken: The time taken to generate the answer.
         confidence_score: Confidence score of the answer of the final round
-        attributes_to_kc_km: List of dictionaries, that represents information from KC, type KM. See LLMOutput
-        attributes_to_kc_mp: List of dictionaries, that represents information from KC, type MP. See LLMOutput
-        attributes_to_b360: List of dictionaries, that represents information from B360. See LLMOutput
+        custom_fields: Dictionary from list of dictionaries, that represents information specific to use case
     """
 
     question: str
@@ -179,9 +177,7 @@ class QueryState:
     additional_information_to_retrieve: str | None = field(default=None)
     time_taken: int = field(default=0)
     confidence_score: int = field(default=0)
-    attributes_to_kc_km: list[dict[str, str, str]] = field(default_factory=list)
-    attributes_to_kc_mp: list[dict[str, str, str]] = field(default_factory=list)
-    attributes_to_b360: list[dict[str, str]] = field(default_factory=list)
+    custom_fields: dict[str, list[dict[str, str]]] = field(default_factory=dict)
 
 
 @dataclass
