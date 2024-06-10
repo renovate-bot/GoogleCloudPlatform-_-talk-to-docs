@@ -1,3 +1,9 @@
+"""Talk2X Custom functions for specific use cases.
+
+This module provides specialized classes and functions tailored for specific use 
+cases and include document retrieval, processing, and storage.
+"""
+
 import copy
 import os
 from collections import defaultdict
@@ -54,11 +60,15 @@ def fill_query_state_with_doc_attributes(query_state: QueryState, post_filtered_
     return default_fill_query_state_with_doc_attributes(query_state, post_filtered_docs)
 
 
-def default_fill_query_state_with_doc_attributes(query_state: QueryState, post_filtered_docs: list[Document]) -> QueryState:
+def default_fill_query_state_with_doc_attributes(
+        query_state: QueryState, post_filtered_docs: list[Document]
+) -> QueryState:
     """
     Updates the provided query_state object with attributes extracted from documents after filtering.
 
-    This function iterates through each document in the `post_filtered_docs` list.  For each key-value pair in a document's metadata, it adds the value to the corresponding list in the `custom_fields` field of the `query_state`. If the key doesn't exist yet, a new list is created.
+    This function iterates through each document in the `post_filtered_docs` list.  For each key-value 
+    pair in a document's metadata, it adds the value to the corresponding list in the `custom_fields` 
+    field of the `query_state`. If the key doesn't exist yet, a new list is created.
 
     Args:
         query_state: The QueryState object to be modified.
@@ -76,7 +86,9 @@ def default_fill_query_state_with_doc_attributes(query_state: QueryState, post_f
     return query_state
 
 
-def custom_fill_query_state_with_doc_attributes(query_state: QueryState, post_filtered_docs: list[Document]) -> QueryState:
+def custom_fill_query_state_with_doc_attributes(
+        query_state: QueryState, post_filtered_docs: list[Document]
+) -> QueryState:
     """
     Updates the provided query_state object with attributes extracted from documents after filtering.
 
@@ -145,7 +157,9 @@ def default_extract_doc_attributes(docs_and_scores: list[Document]) -> list[tupl
         docs_and_scores: A list of Document objects, typically returned from a search operation.
 
     Returns:
-        A list of tuples where each tuple contains all metadata attributes from a Document, in an arbitrary order. The order of the attributes in each tuple may vary depending on the underlying dictionary implementation.
+        A list of tuples where each tuple contains all metadata attributes from a Document, in an 
+        arbitrary order. The order of the attributes in each tuple may vary depending on the 
+        underlying dictionary implementation.
     """
     return [
         tuple([value for _, value in x.metadata.items()])
@@ -173,7 +187,7 @@ def custom_extract_doc_attributes(docs_and_scores: list[Document]) -> list[tuple
 
 class CustomStorage(Storage):
     """
-    Provides a customized document storage strategy for Woolworth-specific document processing.
+    Provides a customized document storage strategy for Retailer-specific document processing.
     This class handles text files by extracting their content, augmenting each document with
     metadata from a corresponding JSON file named similarly to the text file but with a '_metadata.json' suffix.
 
@@ -182,7 +196,7 @@ class CustomStorage(Storage):
     is uniform and predefined.
     """
 
-    def process_directory(self, content_dir: str, woolworth_extract_data: callable) -> dict[str, list[Document]]:
+    def process_directory(self, content_dir: str, extract_data_fn: callable) -> dict[str, list[Document]]:
         """
         Go through files in content_dir and parse their content if the filename ends with ".txt".
         Generate a document object from each file and store it in a hashmap where the key is the
@@ -196,7 +210,7 @@ class CustomStorage(Storage):
                 file_path = os.path.join(content_dir, filename)
                 with open(file_path, "r", encoding="utf-8") as f:
                     content = f.read()
-                document = woolworth_extract_data(content)
+                document = extract_data_fn(content)
                 filename_metadata = file_path.replace(".txt", "_metadata.json")
                 metadata = common.read_json(filename_metadata)
                 for k, v in metadata.items():
@@ -229,7 +243,6 @@ class CustomSemanticDocumentRetriever(SemanticDocumentRetriever):
         if metadata is None or "set_number" not in metadata:
             custom_metadata = {"data_source": "kc"}
             return self._get_related_docs_from_store(store, questions_for_search, custom_metadata)
-        
         b360_metadata = copy.deepcopy(metadata)
         b360_metadata["data_source"] = "b360"
 

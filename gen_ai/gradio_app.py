@@ -41,7 +41,6 @@ THEME_HUE = gr.themes.Color(
     "#0D2E4A",
     "#071927",
     "#030B11",
-    "UHG",
 )
 
 # Predict function
@@ -188,7 +187,6 @@ def feedback(
 
 def authenticate(username, password):
     # Default user and password, stored in .env file (not commited to github)
-    return True
     gradio_user = os.getenv("gradio_user")
     gradio_password = os.getenv("gradio_password")
     if gradio_user is None or gradio_password is None:

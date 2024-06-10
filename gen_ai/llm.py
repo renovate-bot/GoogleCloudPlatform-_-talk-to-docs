@@ -42,8 +42,9 @@ from gen_ai.common.memorystore_utils import serialize_previous_conversation
 from gen_ai.common.react_utils import filter_non_relevant_previous_conversations, get_confidence_score
 from gen_ai.common.retriever import perform_retrieve_round, retrieve_initial_documents
 from gen_ai.common.statefullness import resolve_and_enrich, serialize_response
-from gen_ai.custom_client_functions import fill_query_state_with_doc_attributes
+from gen_ai.common.exponential_retry import concurrent_best_reduce
 from gen_ai.common.document_utils import generate_contexts_from_docs
+from gen_ai.custom_client_functions import fill_query_state_with_doc_attributes
 from gen_ai.deploy.model import Conversation, PersonalizedData, QueryState, transform_to_dictionary
 
 
@@ -87,6 +88,89 @@ def get_total_count(question: str, selected_context: str, previous_rounds: str, 
     )
     query_tokens = Container.token_counter().get_num_tokens_from_string(prompt)
     return query_tokens
+
+
+@concurrent_best_reduce(num_calls=Container.config.get("parallel_main_llm_calls", 1))
+def perform_main_llm_call(
+    react_chain: Any,
+    question: str,
+    previous_context: str,
+    selected_context: str,
+    previous_rounds: list[dict],
+    round_number: int,
+    final_round_statement: str,
+    json_corrector_chain: Any,
+    post_filtered_docs: list,
+) -> tuple[dict[str, Any], float]:
+    """Performs a main LLM (Large Language Model) call to generate an answer to a question.
+
+    This function orchestrates the core LLM interaction, incorporating retry mechanisms for JSON parsing
+    and confidence scoring. It leverages the `@concurrent_best_reduce` decorator for potential concurrent calls.
+
+    Args:
+        react_chain: The LLM chain for generating the initial answer.
+        question: The question to be answered.
+        previous_context: Context from previous interactions or rounds.
+        selected_context: The specific context selected for this call.
+        previous_rounds: History of previous question-answer rounds.
+        round_number: The current round number.
+        final_round_statement: A statement for the final round, if applicable.
+        json_corrector_chain: An LLM chain for correcting JSON output if needed.
+        post_filtered_docs: List of documents filtered post-retrieval (may be empty).
+
+    Returns:
+        Tuple[Dict[str, Any], float]: A tuple containing:
+            - The LLM output as a dictionary (with keys like "answer", "plan_and_summaries", etc.).
+            - The confidence score of the answer.
+    """
+    llm_start_time = default_timer()
+
+    output_raw = react_chain().run(
+        include_run_info=True,
+        return_only_outputs=False,
+        question=question,
+        context=previous_context + selected_context,
+        previous_rounds=previous_rounds,
+        round_number=round_number,
+        final_round_statement=final_round_statement,
+    )
+
+    llm_end_time = default_timer()
+    Container.logger().info(f"Generating main LLM answer took {llm_end_time - llm_start_time} seconds")
+
+    attempts = 2
+    done = False
+    while not done:
+        try:
+            if attempts <= 0:
+                break
+            output_raw = output_raw.replace("`json", "").replace("`", "")
+            output = json5.loads(output_raw)
+            done = True
+        except Exception as e:  # pylint: disable=W0718
+            Container.logger().info(msg=f"Crashed before correct chain, attempts: {attempts}")
+            Container.logger().info(msg=str(e))
+            json_output = json_corrector_chain().run(json=output_raw)
+            json_output = json_output.replace("`json", "").replace("`", "")
+            try:
+                output = json5.loads(json_output)
+                done = True
+            except Exception as e2:  # pylint: disable=W0718
+                Container.logger().info(msg=f"Crashed before correct chain, attempts: {attempts}")
+                Container.logger().info(msg=str(e2))
+                done = False
+                attempts -= 1
+
+    if "answer" not in output or (
+        len(post_filtered_docs) == 0 and not output.get("additional_information_to_retrieve", None)
+    ):
+        output["answer"] = "I was not able to answer this question"
+        output["plan_and_summaries"] = ""
+        output["context_used"] = ""
+
+    confidence = get_confidence_score(question, output["answer"])
+
+    return output, confidence  # return output and confidence
 
 
 @inject
@@ -182,52 +266,17 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
 
         round_outputs = []
         for selected_context in contexts:
-            llm_start_time = default_timer()
-            output_raw = react_chain().run(
-                include_run_info=True,
-                return_only_outputs=False,
-                question=question,
-                context=previous_context + selected_context,
-                previous_rounds=previous_rounds,
-                round_number=round_number,
-                final_round_statement=final_round_statement,
+            output, confidence = perform_main_llm_call(
+                react_chain,
+                question,
+                previous_context,
+                selected_context,
+                previous_rounds,
+                round_number,
+                final_round_statement,
+                json_corrector_chain,
+                post_filtered_docs,
             )
-            llm_end_time = default_timer()
-            Container.logger().info(f"Generating main LLM answer took {llm_end_time - llm_start_time} seconds")
-            attempts = 2
-            done = False
-            while not done:
-                try:
-                    if attempts <= 0:
-                        break
-                    output_raw = output_raw.replace("```json", "").replace("```", "")
-                    output = json5.loads(output_raw)
-                    done = True
-                except Exception as e:  # pylint: disable=W0718
-                    Container.logger().info(msg=f"Crashed before correct chain, attempts: {attempts}")
-                    Container.logger().info(msg=str(e))
-                    json_output = json_corrector_chain().run(json=output_raw)
-                    json_output = json_output.replace("```json", "").replace("```", "")
-                    try:
-                        output = json5.loads(json_output)
-                        done = True
-                    except Exception as e2:  # pylint: disable=W0718
-                        Container.logger().info(msg=f"Crashed before correct chain, attempts: {attempts}")
-                        Container.logger().info(msg=str(e2))
-                        done = False
-                        attempts -= 1
-            if "answer" not in output or (
-                len(post_filtered_docs) == 0 and not output.get("additional_information_to_retrieve", None)
-            ):
-                output["answer"] = "I was not able to answer this question"
-                output["plan_and_summaries"] = ""
-                output["context_used"] = ""
-                confidence = get_confidence_score(question, output["answer"])
-                round_outputs.append((output, confidence))
-                break
-
-            confidence = get_confidence_score(question, output["answer"])
-
             round_outputs.append((output, confidence))
 
         end_time = default_timer()
