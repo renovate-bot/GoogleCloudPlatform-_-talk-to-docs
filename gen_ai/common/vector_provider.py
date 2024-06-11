@@ -195,29 +195,29 @@ class VertexAISearchVectorStore(VectorStore):
         )
 
         client = discoveryengine.SearchServiceClient(client_options=client_options)
-
+        # this is VAIS as a generator
+        # uncomment it if you want not just retriever but generator also
+            # summary_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec(
+            #     summary_result_count=10,
+            #     include_citations=True,
+            #     ignore_adversarial_query=True,
+            #     ignore_non_summary_seeking_query=True,
+            #     model_prompt_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec.ModelPromptSpec(
+            #         preamble="Here is the question"
+            #     ),
+            #     model_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec.ModelSpec(
+            #         version="stable",
+            #     ),
+            # ),
         serving_config = f"projects/{project_id}/locations/{location}/collections/default_collection/engines/{engine_id}/servingConfigs/default_config"
-
         content_search_spec = discoveryengine.SearchRequest.ContentSearchSpec(
-            snippet_spec=discoveryengine.SearchRequest.ContentSearchSpec.SnippetSpec(return_snippet=True),
-            summary_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec(
-                summary_result_count=10,
-                include_citations=True,
-                ignore_adversarial_query=True,
-                ignore_non_summary_seeking_query=True,
-                model_prompt_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec.ModelPromptSpec(
-                    preamble="Here is the question"
-                ),
-                model_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec.ModelSpec(
-                    version="stable",
-                ),
-            ),
+            extractive_content_spec=discoveryengine.SearchRequest.ContentSearchSpec.ExtractiveContentSpec(max_extractive_segment_count=1, return_extractive_segment_score=True, num_previous_segments=2),
         )
 
         request = discoveryengine.SearchRequest(
             serving_config=serving_config,
             query=search_query,
-            page_size=10,
+            page_size=min(10, k),
             content_search_spec=content_search_spec,
             query_expansion_spec=discoveryengine.SearchRequest.QueryExpansionSpec(
                 condition=discoveryengine.SearchRequest.QueryExpansionSpec.Condition.AUTO,
@@ -228,10 +228,10 @@ class VertexAISearchVectorStore(VectorStore):
         )
 
         response = client.search(request)
-        ls = response.results  # [2]
+        ls = response.results
         docs = []
         for item in ls:
-            content = item.document.derived_struct_data["snippets"][0]["snippet"]
+            content = item.document.derived_struct_data["extractive_segments"][0]["content"]
             doc = Document(page_content=content)
             doc.metadata = {
                 "original_filepath": item.document.derived_struct_data["title"],
