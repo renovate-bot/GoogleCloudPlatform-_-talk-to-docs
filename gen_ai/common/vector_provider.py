@@ -232,12 +232,13 @@ class VertexAISearchVectorStore(VectorStore):
         docs = []
         for item in ls:
             content = item.document.derived_struct_data["extractive_segments"][0]["content"]
+            score = item.document.derived_struct_data["extractive_segments"][0]["relevanceScore"]
             doc = Document(page_content=content)
             doc.metadata = {
                 "original_filepath": item.document.derived_struct_data["title"],
                 "section_name": item.document.derived_struct_data["title"],
             }
-            docs.append((doc, 1.0))
+            docs.append((doc, score))
         return docs
 
     def similarity_search_with_score(self, query: str, k: int = 4, **kwargs):
