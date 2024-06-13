@@ -28,6 +28,7 @@ from langchain.vectorstores import Chroma
 from gen_ai.common.common import default_extract_data
 from gen_ai.common.inverted_index import InvertedIndex
 from gen_ai.common.storage import Storage
+from gen_ai.common.ioc_container import Container
 from typing import List
 
 from google.api_core.client_options import ClientOptions
@@ -178,9 +179,9 @@ class VertexAISearchVectorStore(VectorStore):
     """
 
     def __init__(self):
-        self.project_id = "chertushkin-genai-sa"
+        self.project_id = Container.config.get("bq_project_id")
         self.location = "global"
-        self.engine_id = "uhg_1715558830222"
+        self.engine_id = Container.config.get("vais_engine_id", None)
 
     def _search_sample(
         self,
@@ -280,10 +281,10 @@ class VectorStrategyProvider:
         print(f"Loading {self.vector_name} Vector Strategy...")
         if "vertexai" in self.vector_name:
             return VertexAIVectorStrategy(**kwargs)
-        elif "chroma" in self.vector_name:
-            return ChromaVectorStrategy(**kwargs)
         elif "vais" in self.vector_name:
             return VertexAISearchVectorStrategy(**kwargs)
+        elif "chroma" in self.vector_name:
+            return ChromaVectorStrategy(**kwargs)
         else:
             raise ValueError("Not supported embeddings name in config")
 
