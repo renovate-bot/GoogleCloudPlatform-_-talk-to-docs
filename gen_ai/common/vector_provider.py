@@ -190,6 +190,7 @@ class VertexAISearchVectorStore(VectorStore):
         engine_id: str,
         search_query: str,
         k: int = 4,
+        **kwargs,  # pylint: disable=unused-argument
     ) -> List[discoveryengine.SearchResponse]:
         client_options = (
             ClientOptions(api_endpoint=f"{location}-discoveryengine.googleapis.com") if location != "global" else None
