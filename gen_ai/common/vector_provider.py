@@ -90,7 +90,7 @@ class VectorStrategy(ABC):
         storage_interface (Storage): An interface for interacting with storage systems.
     """
 
-    def __init__(self, storage_interface: Storage, config):
+    def __init__(self, storage_interface: Storage, config: dict[str, str]):
         self.storage_interface = storage_interface
         self.config = config
 
