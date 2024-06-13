@@ -18,9 +18,13 @@ import shutil
 import string
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import List
 
 import pandas as pd
-from google.cloud import aiplatform, storage
+from google.api_core.client_options import ClientOptions
+from google.cloud import aiplatform
+from google.cloud import discoveryengine_v1 as discoveryengine
+from google.cloud import storage
 from langchain.schema import Document
 from langchain.schema.embeddings import Embeddings
 from langchain.vectorstores import Chroma
@@ -28,10 +32,6 @@ from langchain.vectorstores import Chroma
 from gen_ai.common.common import default_extract_data
 from gen_ai.common.inverted_index import InvertedIndex
 from gen_ai.common.storage import Storage
-from typing import List
-
-from google.api_core.client_options import ClientOptions
-from google.cloud import discoveryengine_v1 as discoveryengine
 
 
 @dataclass
@@ -198,21 +198,27 @@ class VertexAISearchVectorStore(VectorStore):
         client = discoveryengine.SearchServiceClient(client_options=client_options)
         # this is VAIS as a generator
         # uncomment it if you want not just retriever but generator also
-            # summary_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec(
-            #     summary_result_count=10,
-            #     include_citations=True,
-            #     ignore_adversarial_query=True,
-            #     ignore_non_summary_seeking_query=True,
-            #     model_prompt_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec.ModelPromptSpec(
-            #         preamble="Here is the question"
-            #     ),
-            #     model_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec.ModelSpec(
-            #         version="stable",
-            #     ),
-            # ),
-        serving_config = f"projects/{project_id}/locations/{location}/collections/default_collection/engines/{engine_id}/servingConfigs/default_config"
+        # summary_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec(
+        #     summary_result_count=10,
+        #     include_citations=True,
+        #     ignore_adversarial_query=True,
+        #     ignore_non_summary_seeking_query=True,
+        #     model_prompt_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec.ModelPromptSpec(
+        #         preamble="Here is the question"
+        #     ),
+        #     model_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec.ModelSpec(
+        #         version="stable",
+        #     ),
+        # ),
+        serving_config = (
+            f"projects/{project_id}/locations/{location}/"
+            f"collections/default_collection/engines/{engine_id}/"
+            "servingConfigs/default_config"
+        )
         content_search_spec = discoveryengine.SearchRequest.ContentSearchSpec(
-            extractive_content_spec=discoveryengine.SearchRequest.ContentSearchSpec.ExtractiveContentSpec(max_extractive_segment_count=1, return_extractive_segment_score=True, num_previous_segments=2),
+            extractive_content_spec=discoveryengine.SearchRequest.ContentSearchSpec.ExtractiveContentSpec(
+                max_extractive_segment_count=1, return_extractive_segment_score=True, num_previous_segments=2
+            ),
         )
 
         request = discoveryengine.SearchRequest(
@@ -250,6 +256,7 @@ class VertexAISearchVectorStore(VectorStore):
             engine_id=self.engine_id,
             search_query=query,
             k=k,
+            **kwargs,
         )
 
     def similarity_search(self, query: str, k: int = 4, **kwargs):
@@ -325,7 +332,6 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         self.vectore_store_path = f"{vectore_store_path}_vais"
         self.project_id = config.get("bq_project_id")
         self.engine_id = config.get("vais_engine_id", None)
-
 
     def get_vector_indices(
         self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str
