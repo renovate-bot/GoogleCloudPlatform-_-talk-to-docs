@@ -134,6 +134,7 @@ def provide_vector_indices(regenerate: bool = False) -> Chroma:
     vector_strategy_provider = VectorStrategyProvider(vector_name)
     vector_strategy: VectorStrategy = vector_strategy_provider(
         storage_interface=DefaultStorage(),
+        config=config,
         vectore_store_path=vectore_store_path
     )
 

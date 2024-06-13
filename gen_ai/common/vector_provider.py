@@ -28,7 +28,6 @@ from langchain.vectorstores import Chroma
 from gen_ai.common.common import default_extract_data
 from gen_ai.common.inverted_index import InvertedIndex
 from gen_ai.common.storage import Storage
-from gen_ai.common.ioc_container import Container
 from typing import List
 
 from google.api_core.client_options import ClientOptions
@@ -91,8 +90,9 @@ class VectorStrategy(ABC):
         storage_interface (Storage): An interface for interacting with storage systems.
     """
 
-    def __init__(self, storage_interface: Storage):
+    def __init__(self, storage_interface: Storage, config):
         self.storage_interface = storage_interface
+        self.config = config
 
     @abstractmethod
     def get_vector_indices(
@@ -178,10 +178,10 @@ class VertexAISearchVectorStore(VectorStore):
         chroma (Chroma): The Chroma instance for managing the vector store.
     """
 
-    def __init__(self):
-        self.project_id = Container.config.get("bq_project_id")
+    def __init__(self, project_id: str, engine_id: str):
+        self.project_id = project_id
         self.location = "global"
-        self.engine_id = Container.config.get("vais_engine_id", None)
+        self.engine_id = engine_id
 
     def _search_sample(
         self,
@@ -292,8 +292,8 @@ class VectorStrategyProvider:
 class ChromaVectorStrategy(VectorStrategy):
     """Concrete implementation of VectorStrategy for using Chroma as the vector store."""
 
-    def __init__(self, storage_interface: Storage, vectore_store_path: str) -> None:
-        super().__init__(storage_interface)
+    def __init__(self, storage_interface: Storage, config: dict[str, str], vectore_store_path: str) -> None:
+        super().__init__(storage_interface, config)
         self.vectore_store_path = f"{vectore_store_path}_chroma"
 
     def get_vector_indices(
@@ -320,14 +320,17 @@ class ChromaVectorStrategy(VectorStrategy):
 class VertexAISearchVectorStrategy(VectorStrategy):
     """Concrete implementation of VectorStrategy for using Vertex AI Search as the vector store."""
 
-    def __init__(self, storage_interface: Storage, vectore_store_path: str) -> None:
-        super().__init__(storage_interface)
+    def __init__(self, storage_interface: Storage, config: dict[str, str], vectore_store_path: str) -> None:
+        super().__init__(storage_interface, config)
         self.vectore_store_path = f"{vectore_store_path}_vais"
+        self.project_id = config.get("bq_project_id")
+        self.engine_id = config.get("vais_engine_id", None)
+
 
     def get_vector_indices(
         self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str
     ):
-        return VertexAISearchVectorStore()
+        return VertexAISearchVectorStore(self.project_id, self.engine_id)
 
 
 class VertexAIVectorStrategy(VectorStrategy):
@@ -337,8 +340,8 @@ class VertexAIVectorStrategy(VectorStrategy):
     ARTICLE_INDEX = "article_index"
     ARTICLE_INDEX_ENDPOINT = "article_index_endpoint"
 
-    def __init__(self, storage_interface: Storage, vectore_store_path: str) -> None:
-        super().__init__(storage_interface)
+    def __init__(self, storage_interface: Storage, config: dict[str, str], vectore_store_path: str) -> None:
+        super().__init__(storage_interface, config)
         self.vectore_store_path = f"{vectore_store_path}_vertexai"
 
     def __create(self, embeddings: Embeddings, processed_files_dir: str):
