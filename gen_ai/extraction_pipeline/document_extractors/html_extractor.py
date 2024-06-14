@@ -103,7 +103,7 @@ class HtmlExtractor(BaseExtractor):
         return True
 
     def process(self, output_dir: str) -> bool:
-        if self.html_extraction == "custom2":
+        if self.html_extraction == "custom":
             ingestor = CustomHtmlIngestor(self.filepath)
         else:
             ingestor = DefaultHtmlIngestor(self.filepath)
