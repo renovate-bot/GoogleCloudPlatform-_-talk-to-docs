@@ -211,7 +211,7 @@ class DocxExtractor(BaseExtractor):
         document_chunks = document_chunker.chunk_the_document()
         additional_kc_chunks = (
             CustomKcDocxChunker(self.document, self.raw_text).chunk_the_document()
-            if self.docx_chunking == "combo"
+            if self.docx_chunking == "custom"
             else None
         )
         if additional_kc_chunks:
