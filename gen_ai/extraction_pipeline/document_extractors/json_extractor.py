@@ -653,7 +653,7 @@ class CustomJsonChunkerThree(CustomJsonChunkerTwo):
                 print(section_name)
         deductibles_text = output_data.get((benefit_id, "Deductibles"))
         for benefit_id, section_name in output_data:
-            if section_name! = "Deductibles":
+            if section_name != "Deductibles":
                 output_data[(benefit_id, section_name)] += deductibles_text 
 
 
