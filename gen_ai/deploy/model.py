@@ -37,6 +37,26 @@ def transform_to_dictionary(base_model: BaseModel) -> dict:
 
 
 class PersonalizedData(BaseModel):
+    """Represents personalized policy and patient data.
+
+    This class models the personalized information associated with an insurance
+    policy and the patient covered by the policy.
+
+    Attributes:
+        member_id (str): Unique identifier for the policy member.
+        policy_title (str): Title or name of the insurance policy.
+        policy_holder_name (str): Full name of the policyholder.
+        patient_first_name (str): First name of the patient.
+        patient_last_name (str): Last name of the patient.
+        patient_age (int): Age of the patient in years.
+        patient_gender (str): Gender of the patient (e.g., "M", "F", "Other").
+        effective_date (str): Date the policy becomes effective (YYYY-MM-DD).
+        agent_name (str): Name of the insurance agent.
+        set_number (str): A set identifier for the policy.
+        policy_number (str): Unique identifier for the insurance policy.
+        session_id (str): Identifier for the current session or interaction.
+    """
+
     member_id: str = ""
     policy_title: str = ""
     policy_holder_name: str = ""

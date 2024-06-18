@@ -18,9 +18,13 @@ import shutil
 import string
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import List
 
 import pandas as pd
-from google.cloud import aiplatform, storage
+from google.api_core.client_options import ClientOptions
+from google.cloud import aiplatform
+from google.cloud import discoveryengine_v1 as discoveryengine
+from google.cloud import storage
 from langchain.schema import Document
 from langchain.schema.embeddings import Embeddings
 from langchain.vectorstores import Chroma
@@ -28,6 +32,7 @@ from langchain.vectorstores import Chroma
 from gen_ai.common.common import default_extract_data
 from gen_ai.common.inverted_index import InvertedIndex
 from gen_ai.common.storage import Storage
+
 
 @dataclass
 class DeployedEndpoint:
@@ -85,8 +90,9 @@ class VectorStrategy(ABC):
         storage_interface (Storage): An interface for interacting with storage systems.
     """
 
-    def __init__(self, storage_interface: Storage):
+    def __init__(self, storage_interface: Storage, config: dict[str, str]):
         self.storage_interface = storage_interface
+        self.config = config
 
     @abstractmethod
     def get_vector_indices(
@@ -165,6 +171,104 @@ class VertexVectorStore(VectorStore):
         return self.similarity_search(query, k, **kwargs)
 
 
+class VertexAISearchVectorStore(VectorStore):
+    """Concrete implementation of VectorStore using Vertex AI Search for vector storage and search.
+    # Important: VAIS (VertexAIVectorStore) and VVS (VertexVectorStore) are DIFFERENT THINGS
+    Attributes:
+        chroma (Chroma): The Chroma instance for managing the vector store.
+    """
+
+    def __init__(self, project_id: str, engine_id: str):
+        self.project_id = project_id
+        self.location = "global"
+        self.engine_id = engine_id
+
+    def _search_sample(
+        self,
+        project_id: str,
+        location: str,
+        engine_id: str,
+        search_query: str,
+        k: int = 4,
+        **kwargs,  # pylint: disable=unused-argument
+    ) -> List[discoveryengine.SearchResponse]:
+        client_options = (
+            ClientOptions(api_endpoint=f"{location}-discoveryengine.googleapis.com") if location != "global" else None
+        )
+
+        client = discoveryengine.SearchServiceClient(client_options=client_options)
+        # this is VAIS as a generator
+        # uncomment it if you want not just retriever but generator also
+        # summary_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec(
+        #     summary_result_count=10,
+        #     include_citations=True,
+        #     ignore_adversarial_query=True,
+        #     ignore_non_summary_seeking_query=True,
+        #     model_prompt_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec.ModelPromptSpec(
+        #         preamble="Here is the question"
+        #     ),
+        #     model_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec.ModelSpec(
+        #         version="stable",
+        #     ),
+        # ),
+        serving_config = (
+            f"projects/{project_id}/locations/{location}/"
+            f"collections/default_collection/engines/{engine_id}/"
+            "servingConfigs/default_config"
+        )
+        content_search_spec = discoveryengine.SearchRequest.ContentSearchSpec(
+            extractive_content_spec=discoveryengine.SearchRequest.ContentSearchSpec.ExtractiveContentSpec(
+                max_extractive_segment_count=1, return_extractive_segment_score=True, num_previous_segments=2
+            ),
+        )
+
+        request = discoveryengine.SearchRequest(
+            serving_config=serving_config,
+            query=search_query,
+            page_size=min(10, k),
+            content_search_spec=content_search_spec,
+            query_expansion_spec=discoveryengine.SearchRequest.QueryExpansionSpec(
+                condition=discoveryengine.SearchRequest.QueryExpansionSpec.Condition.AUTO,
+            ),
+            spell_correction_spec=discoveryengine.SearchRequest.SpellCorrectionSpec(
+                mode=discoveryengine.SearchRequest.SpellCorrectionSpec.Mode.AUTO
+            ),
+        )
+
+        response = client.search(request)
+        ls = response.results
+        docs = []
+        for item in ls:
+            content = item.document.derived_struct_data["extractive_segments"][0]["content"]
+            score = item.document.derived_struct_data["extractive_segments"][0]["relevanceScore"]
+            doc = Document(page_content=content)
+            doc.metadata = {
+                "original_filepath": item.document.derived_struct_data["title"],
+                "section_name": item.document.derived_struct_data["title"],
+            }
+            docs.append((doc, score))
+        return docs
+
+    def similarity_search_with_score(self, query: str, k: int = 4, **kwargs):
+
+        return self._search_sample(
+            project_id=self.project_id,
+            location=self.location,
+            engine_id=self.engine_id,
+            search_query=query,
+            k=k,
+            **kwargs,
+        )
+
+    def similarity_search(self, query: str, k: int = 4, **kwargs):
+        return self.similarity_search_with_score(query, k)
+
+    def max_marginal_relevance_search(
+        self, query: str, k: int = 4, fetch_k: int = 20, lambda_mult: float = 0.5, **kwargs
+    ):
+        return []
+
+
 class VectorStrategyProvider:
     """Factory class for selecting the appropriate VectorStrategy implementation."""
 
@@ -185,6 +289,8 @@ class VectorStrategyProvider:
         print(f"Loading {self.vector_name} Vector Strategy...")
         if "vertexai" in self.vector_name:
             return VertexAIVectorStrategy(**kwargs)
+        elif "vais" in self.vector_name:
+            return VertexAISearchVectorStrategy(**kwargs)
         elif "chroma" in self.vector_name:
             return ChromaVectorStrategy(**kwargs)
         else:
@@ -194,12 +300,12 @@ class VectorStrategyProvider:
 class ChromaVectorStrategy(VectorStrategy):
     """Concrete implementation of VectorStrategy for using Chroma as the vector store."""
 
-    def __init__(self, storage_interface: Storage, vectore_store_path: str) -> None:
-        super().__init__(storage_interface)
+    def __init__(self, storage_interface: Storage, config: dict[str, str], vectore_store_path: str) -> None:
+        super().__init__(storage_interface, config)
         self.vectore_store_path = f"{vectore_store_path}_chroma"
 
     def get_vector_indices(
-            self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str
+        self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str
     ):
         if not os.path.exists(self.vectore_store_path) or regenerate:
             if os.path.exists(self.vectore_store_path):
@@ -219,6 +325,21 @@ class ChromaVectorStrategy(VectorStrategy):
         return vector_indices
 
 
+class VertexAISearchVectorStrategy(VectorStrategy):
+    """Concrete implementation of VectorStrategy for using Vertex AI Search as the vector store."""
+
+    def __init__(self, storage_interface: Storage, config: dict[str, str], vectore_store_path: str) -> None:
+        super().__init__(storage_interface, config)
+        self.vectore_store_path = f"{vectore_store_path}_vais"
+        self.project_id = config.get("bq_project_id")
+        self.engine_id = config.get("vais_engine_id", None)
+
+    def get_vector_indices(
+        self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str
+    ):
+        return VertexAISearchVectorStore(self.project_id, self.engine_id)
+
+
 class VertexAIVectorStrategy(VectorStrategy):
     """Concrete implementation of VectorStrategy for using Vertex AI as the vector store."""
 
@@ -226,8 +347,8 @@ class VertexAIVectorStrategy(VectorStrategy):
     ARTICLE_INDEX = "article_index"
     ARTICLE_INDEX_ENDPOINT = "article_index_endpoint"
 
-    def __init__(self, storage_interface: Storage, vectore_store_path: str) -> None:
-        super().__init__(storage_interface)
+    def __init__(self, storage_interface: Storage, config: dict[str, str], vectore_store_path: str) -> None:
+        super().__init__(storage_interface, config)
         self.vectore_store_path = f"{vectore_store_path}_vertexai"
 
     def __create(self, embeddings: Embeddings, processed_files_dir: str):
@@ -340,8 +461,8 @@ class VertexAIVectorStrategy(VectorStrategy):
         return deployed_endpoints
 
     def get_vector_indices(
-            self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str
-            ):
+        self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str
+    ):
         aiplatform.init()
         if not os.path.exists(self.vectore_store_path):
             all_jsons = self.__create(embeddings, processed_files_dir)

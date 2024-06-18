@@ -231,8 +231,8 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
         pre_filtered_docs = prev_pre_filtered_docs + pre_filtered_docs
         pre_filtered_docs = remove_duplicates(pre_filtered_docs)
         post_filtered_docs = prev_post_filtered_docs + post_filtered_docs
-        post_filtered_docs = remove_duplicates(post_filtered_docs)
 
+    post_filtered_docs = remove_duplicates(post_filtered_docs)
     contexts = generate_contexts_from_docs(post_filtered_docs, query_state)
 
     final_round_statement = ""
