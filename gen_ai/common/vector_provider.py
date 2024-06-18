@@ -266,7 +266,7 @@ class VertexAISearchVectorStore(VectorStore):
     def max_marginal_relevance_search(
         self, query: str, k: int = 4, fetch_k: int = 20, lambda_mult: float = 0.5, **kwargs
     ):
-        return self.similarity_search_with_score(query, k)
+        return []
 
 
 class VectorStrategyProvider:
