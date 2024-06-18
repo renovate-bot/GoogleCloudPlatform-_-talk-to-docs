@@ -1,38 +1,49 @@
-import pandas as pd
-from google.cloud import bigquery
-import os
 import json
+import os
+
+import google.auth
+import pandas as pd
 import requests
+from google.auth.transport.requests import Request
+from google.cloud import bigquery
 
 
-def update_the_data_store(input_dir: str, config: dict[str, str]):
+def update_the_data_store(input_dir: str, config: dict[str, str], data_store_id: str | None = None):
     project_id = config.get("project_id")
     dataset_id = config.get("dataset_id")
-    table_id = config.get("table_id")
-    data_store_id = config.get("data_store_id")
+    table_name = config.get("table_name")
+    if not data_store_id or data_store_id == "datastore":
+        data_store_id = config.get("data_store_id")
 
     # BigQuery Client
     client = bigquery.Client(project=project_id)
 
     # create dataset and table if not exists
-    create_dataset_and_table(client, project_id, dataset_id, table_id)
-
+    print("Start create_dataset_and_table")
+    create_dataset_and_table(client, project_id, dataset_id, table_name)
+    print("Done create_dataset_and_table")
     # create merged json file
+    print("Start merge_json_files")
     df = merge_json_files(input_dir)
+    print("Done merge_json_files")
 
     # put the json file into bq
+    print("Start insert_all_rows")
+    table_id = f'{project_id}.{dataset_id}.{table_name}'
     inserted = insert_all_rows(df, client, table_id)
     if not inserted:
         return False
+    print("Done insert_all_rows")
 
     # fetch from bq to data store
+    print("Start updated_data_store")
     updated_data_store = import_bigquery_to_datastore_batched(
         project_id,
-        dataset_id,
         table_id,
         data_store_id,
         batch_size=100
     )
+    print("Done updated_data_store")
     if not updated_data_store:
         return False
     return True
@@ -61,7 +72,7 @@ def merge_json_files(input_dir: str) -> pd.DataFrame:
     return df
 
 
-def create_dataset_and_table(client, project_id: str, dataset_id: str, table_id: str):
+def create_dataset_and_table(client, project_id: str, dataset_id: str, table_name: str):
 
     # Create the dataset if it doesn't exist
     dataset = bigquery.Dataset(f"{project_id}.{dataset_id}")
@@ -76,7 +87,7 @@ def create_dataset_and_table(client, project_id: str, dataset_id: str, table_id:
             mode='NULLABLE')
     ]
 
-    table_id = f'{project_id}.{dataset_id}.{table_id}'
+    table_id = f'{project_id}.{dataset_id}.{table_name}'
 
     table_exists = False
     try:
@@ -113,9 +124,11 @@ def insert_all_rows(df: pd.DataFrame, client, table_id: str):
         return False
 
 
-def import_bigquery_to_datastore_batched(project_id: str, dataset_id: str, table_id: str, data_store_id: str, batch_size=100):
+def import_bigquery_to_datastore_batched(project_id: str, table_id: str, data_store_id: str, batch_size=100):
     """Imports data from BigQuery to Generative AI App Builder Datastore in batches."""
-
+    print(project_id)
+    print(table_id)
+    print(data_store_id)
     # Authenticate with Google Cloud
     credentials, _ = google.auth.default()
     credentials.refresh(Request())
@@ -123,7 +136,7 @@ def import_bigquery_to_datastore_batched(project_id: str, dataset_id: str, table
 
     # 1. Fetch data from BigQuery
     client = bigquery.Client(project=project_id)
-    query = f"SELECT id, JsonData FROM `{project_id}.{dataset_id}.{table_id}`"
+    query = f"SELECT id, JsonData FROM `{table_id}`"
     query_job = client.query(query)
 
     # 2. Prepare and send documents in batches
@@ -138,12 +151,12 @@ def import_bigquery_to_datastore_batched(project_id: str, dataset_id: str, table
 
     if not all_rows:
         print("Rows not found.")
-        return
+        return False
 
     for i in range(0, len(all_rows), batch_size):
-        batch_rows = all_rows[i : i + batch_size]  
+        batch_rows = all_rows[i : i + batch_size]
         documents = [
-            {"id": row.id, "jsonData": row.JsonData} 
+            {"id": row.id, "jsonData": row.JsonData}
             for row in batch_rows
         ]  # No need to filter None, as list(query_job.result()) handles it
 
@@ -161,7 +174,7 @@ def import_bigquery_to_datastore_batched(project_id: str, dataset_id: str, table
 
         if response.status_code == 200:
             print(f"Batch imported successfully! (Rows {i+1}-{i+len(documents)})")
-            return True
         else:
             print(f"Error importing batch: {response.status_code}, {response.text}")
             return False
+    return True
