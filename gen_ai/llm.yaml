@@ -1,9 +1,9 @@
 # This file defines the LLM prompts and configuration parameters used
 # to converse with a user.
 # Project and User specific configuration
-bq_project_id: project_name # change for the user's project id
-dataset_name: dataset_name # change for new project
-gcs_source_bucket: gs://bucket location # change for new project
+bq_project_id: chertushkin-genai-sa # change for the user's project id
+dataset_name: uhg2 # change for new project
+gcs_source_bucket: gs://uhg_data/extractions_deductibles_populated_wo_consec_wspace # change for new project
 terraform_credentials: terraform-service-account-credentials.json # change for the user
 terraform_instance_name: talk-to-docs-instance
 terraform_redis_name: talk-to-docs-redis-instance
@@ -15,14 +15,13 @@ vector_store_path: gen_ai/vector_store
 users_file: /mnt/resources/users.json
 logs_directory: gen_ai/logs
 gradio_root_path: /t2x-mig-ui
-vais_engine_id: engine_id # should be set if vector_name is vais
 # Technical configuration
 model_name: gemini-1.5-flash-preview-0514
 scoring_model_name: gemini-1.5-flash-preview-0514
 embeddings_name: vertexai
 embeddings_model_name: textembedding-gecko@003
 vector_name: vais
-document_retriever: semantic #custom is for custom use case
+document_retriever: custom #custom is for custom use case
 api_mode: stateless
 personalization: true
 temperature: 0.5

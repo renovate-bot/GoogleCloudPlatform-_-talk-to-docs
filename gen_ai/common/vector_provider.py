@@ -18,12 +18,14 @@ import random
 import shutil
 import string
 import subprocess
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List, Optional
 
 import pandas as pd
 import requests
+import tqdm
 from google.api_core.client_options import ClientOptions
 from google.auth.transport.requests import Request
 from google.cloud import aiplatform, discoveryengine
@@ -36,7 +38,6 @@ from langchain.vectorstores import Chroma
 
 from gen_ai.common.common import default_extract_data
 from gen_ai.common.inverted_index import InvertedIndex
-from gen_ai.common.measure_utils import trace_on
 from gen_ai.common.storage import Storage
 
 
@@ -196,6 +197,7 @@ class VertexAISearchVectorStore(VectorStore):
         engine_id: str,
         search_query: str,
         k: int = 4,
+        filter=filter,
         **kwargs,  # pylint: disable=unused-argument
     ) -> List[discoveryengine.SearchResponse]:
         client_options = (
@@ -227,12 +229,12 @@ class VertexAISearchVectorStore(VectorStore):
                 max_extractive_segment_count=1, return_extractive_segment_score=True, num_previous_segments=2
             ),
         )
-
         request = discoveryengine.SearchRequest(
             serving_config=serving_config,
             query=search_query,
             page_size=min(10, k),
             content_search_spec=content_search_spec,
+            filter=filter,
             query_expansion_spec=discoveryengine.SearchRequest.QueryExpansionSpec(
                 condition=discoveryengine.SearchRequest.QueryExpansionSpec.Condition.AUTO,
             ),
@@ -255,7 +257,7 @@ class VertexAISearchVectorStore(VectorStore):
             docs.append((doc, score))
         return docs
 
-    def similarity_search_with_score(self, query: str, k: int = 4, **kwargs):
+    def similarity_search_with_score(self, query: str, k: int = 4, filter: str = None, **kwargs):
 
         return self._search_sample(
             project_id=self.project_id,
@@ -263,6 +265,7 @@ class VertexAISearchVectorStore(VectorStore):
             engine_id=self.engine_id,
             search_query=query,
             k=k,
+            filter=filter,
             **kwargs,
         )
 
@@ -345,12 +348,10 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         aiplatform.init()
         if not os.path.exists(self.vectore_store_path):
             print("No VAIS vector store found, creating one...")
-            original_bucket = self.config.get("gcs_source_bucket")
             dataset_name = self.config.get("dataset_name")
             project_id = self.config.get("bq_project_id")
 
-            output_jsonl_path, new_bucket_name = self.__prepare_waize_format(original_bucket, dataset_name)
-            waize_gcs_uri = self.__copy_to_waize_bucket(original_bucket, new_bucket_name, output_jsonl_path)
+            waize_gcs_uri = self.__prepare_waize_format(processed_files_dir, dataset_name)
             waize_data_store = self.__create_waize_data_store(project_id, dataset_name)
             waize_data_store = self.__import_data_to_waize_data_store(project_id, waize_data_store, waize_gcs_uri)
             waize_engine_id = self.__create_waize_app(project_id, dataset_name, waize_data_store)
@@ -359,18 +360,18 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             print("VAIS vector store exists, retrieving the values...")
             waize_engine_id = self.__deserialize_engine_id()
 
-        return VertexAISearchVectorStore(self.project_id, waize_engine_id)
+        return VertexAISearchVectorStore(self.config.get("bq_project_id"), waize_engine_id)
 
     def __deserialize_engine_id(self):
-        vais_path = os.path.join(self.vector_store_path, "vais_urls.json")
+        vais_path = os.path.join(self.vectore_store_path, "vais_urls.json")
         with open(vais_path, "r") as f:
             vais_urls = json.load(f)
         print(f"VAIS urls are: \n {vais_urls}")
         return vais_urls["vais_engine_id"]
 
     def __serialize_engine_id(self, waize_engine_id, waize_data_store, waize_gcs_uri):
-        os.mkdir(self.vector_store_path, exist_ok=True)
-        vais_path = os.path.join(self.vector_store_path, "vais_urls.json")
+        os.makedirs(self.vectore_store_path, exist_ok=True)
+        vais_path = os.path.join(self.vectore_store_path, "vais_urls.json")
         vais_urls = {
             "vais_engine_id": waize_engine_id,
             "vais_data_store": waize_data_store,
@@ -382,101 +383,57 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         print(f"Saved VAIS urls to {vais_path}")
         print(f"VAIS urls are: \n {vais_urls}")
 
-    @trace_on("Preparing for VAIS format", measure_time=True)
-    def __prepare_waize_format(self, bucket_name, dataset_name):
+    def __prepare_waize_format(self, processed_dir, dataset_name):
         """
-        Creates a JSONL file from pairs of .txt and _metadata.json files in a GCS bucket.
+        Creates a JSONL file from pairs of .txt and _metadata.json files in a local directory
+        and uploads them to a new GCS bucket.
 
         Args:
-            bucket_name: The name of the GCS bucket to process.
+            processed_dir: The local directory containing the processed files.
+            dataset_name: The name to use for the dataset.
         """
-
+        print("Preparing format for VAIS...")
         storage_client = storage.Client()
-        bucket = storage_client.bucket(bucket_name)
 
         random_suffix = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
-        new_bucket_name = f"{bucket_name}-{dataset_name}-jsonl-{random_suffix}"
+        new_bucket_name = f"{dataset_name}-jsonl-{random_suffix}"
+        new_bucket = storage_client.bucket(new_bucket_name)
+        new_bucket.create()
 
-        # Get all blobs
-        all_blobs = list(bucket.list_blobs())
-
-        # Filter for JSON metadata files
-        json_blobs = [blob for blob in all_blobs if blob.name.endswith("_metadata.json")]
+        print(f"Copying the Documents and JSONL file to bucket: {new_bucket_name}")
         jsonl_data = []
-        for i, json_blob in enumerate(json_blobs):
-            # Extract file name base (without _metadata.json)
-            file_name_base = json_blob.name[:-14]  # Remove "_metadata.json"
+        all_files = list(os.listdir(processed_dir))
+        for i, filename in tqdm.tqdm(enumerate(all_files), total=len(all_files)):
+            if filename.endswith("_metadata.json"):
+                file_name_base = filename[:-14]  # Remove "_metadata.json"
+                txt_file_path = os.path.join(processed_dir, f"{file_name_base}.txt")
+                if not os.path.isfile(txt_file_path):
+                    continue  # Skip if no matching TXT file
 
-            # Check for matching TXT file
-            txt_blob = bucket.blob(f"{file_name_base}.txt")
-            if not txt_blob.exists():
-                continue  # Skip if no matching TXT file
+                metadata_path = os.path.join(processed_dir, filename)
+                with open(metadata_path, "r") as metadata_file:
+                    metadata = json.load(metadata_file)
+                metadata_str = json.dumps(metadata)
 
-            # Load JSON metadata
-            metadata = json.loads(json_blob.download_as_text())
-            metadata_str = json.dumps(metadata)
-            # Create JSONL entry
-            jsonl_entry = {
-                "id": str(i),
-                "jsonData": metadata_str,
-                "content": {"mimeType": "text/plain", "uri": f"gs://{new_bucket_name}/data/{txt_blob.name}"},
-            }
-            jsonl_data.append(jsonl_entry)
+                txt_blob = new_bucket.blob(f"data/{file_name_base}.txt")
+                txt_blob.upload_from_filename(txt_file_path)
 
-        # Write to a JSONL file (locally or to GCS)
-        with open("output.jsonl", "w") as outfile:
+                jsonl_entry = {
+                    "id": str(i),
+                    "jsonData": metadata_str,
+                    "content": {"mimeType": "text/plain", "uri": f"gs://{new_bucket_name}/data/{file_name_base}.txt"},
+                }
+                jsonl_data.append(jsonl_entry)
+
+        jsonl_path = "output.jsonl"
+        with open(jsonl_path, "w") as outfile:
             for entry in jsonl_data:
                 outfile.write(json.dumps(entry) + "\n")
-
-        return "output.jsonl", new_bucket_name
-
-    @trace_on("Creating the bucket for VAIS", measure_time=True)
-    def __copy_to_waize_bucket(self, original_bucket_name, new_bucket_name, output_jsonl_path):
-        """
-        Creates a new bucket, copies TXT files to a 'data' subfolder, and places the output.jsonl in the bucket.
-
-        Args:
-            original_bucket_name: The name of the GCS bucket where the original files reside.
-            new_bucket_name: The name of the new GCS bucket
-            output_jsonl_path: The path to the JSONL file
-        """
-
-        storage_client = storage.Client()
-        new_bucket = storage_client.bucket(new_bucket_name)
-        original_bucket = storage_client.bucket(original_bucket_name)
-
-        # Create the new bucket (only if it doesn't exist)
-        if not new_bucket.exists():
-            new_bucket.create()
-            print(f"Created bucket: gs://{new_bucket_name}")
-
-        txt_blobs = [blob for blob in original_bucket.list_blobs() if blob.name.endswith(".txt")]
-
-        for txt_blob in txt_blobs:
-            # Download TXT file to a temporary local file
-            try:
-                local_txt_path = f"/tmp/{txt_blob.name}"  # Using a temporary directory
-                txt_blob.download_to_filename(local_txt_path)
-
-                # Upload TXT file to the new bucket
-                new_blob = new_bucket.blob(f"data/{txt_blob.name}")
-                new_blob.upload_from_filename(local_txt_path)
-
-            except Exception as e:
-                print(f"Error processing file {txt_blob.name}: {e}")
-            finally:
-                # Clean up the temporary file
-                if os.path.exists(local_txt_path):
-                    os.remove(local_txt_path)
-
-        # Copy output.jsonl to the new bucket
-        output_blob = new_bucket.blob("output.jsonl")  # Place in root of the bucket
-        output_blob.upload_from_filename(output_jsonl_path)
-        print(f"Copied output.jsonl to: gs://{new_bucket_name}/output.jsonl")
+            jsonl_blob = new_bucket.blob(jsonl_path)
+            jsonl_blob.upload_from_filename(jsonl_path)
 
         return new_bucket_name
 
-    @trace_on("Creating the Data Store for VAIS", measure_time=True)
     def __create_waize_data_store(self, project_id, dataset_name):
         """Sends an API request to create a data store in Google Discovery Engine.
 
@@ -486,10 +443,11 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         Returns:
             requests.Response: The response object from the API request.
         """
+        print("Creating the Data Store for VAIS...")
         random_suffix = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
         new_data_store = f"data_store-{dataset_name}-{random_suffix}"
+        new_data_store_name = f"Data store: {new_data_store}"
 
-        # Get access token using gcloud CLI
         access_token = subprocess.check_output("gcloud auth print-access-token", shell=True, text=True).strip()
 
         headers = {
@@ -501,7 +459,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         url = f"https://discoveryengine.googleapis.com/v1alpha/projects/{project_id}/locations/global/collections/default_collection/dataStores?dataStoreId={new_data_store}"
 
         data = {
-            "displayName": "the_store",
+            "displayName": f"{new_data_store_name}",
             "industryVertical": "GENERIC",
             "solutionTypes": ["SOLUTION_TYPE_SEARCH"],
             "contentConfig": "CONTENT_REQUIRED",
@@ -509,12 +467,28 @@ class VertexAISearchVectorStrategy(VectorStrategy):
 
         response = requests.post(url, headers=headers, json=data)
 
-        # Check for errors
         response.raise_for_status()
 
         return new_data_store
 
-    @trace_on("Importing Documents to the Data Store for VAIS", measure_time=True)
+    def __import_finished(self, project_id: str, data_store_id: str):
+        client_options = None
+        client = discoveryengine.DocumentServiceClient(client_options=client_options)
+        parent = client.branch_path(
+            project=project_id,
+            data_store=data_store_id,
+            location="global",
+            branch="default_branch",
+        )
+        print("Checking status of import to VAIS")
+        try:
+            response = client.list_documents(parent=parent)
+            if len(list(response)) > 0:
+                return True
+        except Exception as e:
+            print(f"Error: {e}")
+            return False
+
     def __import_data_to_waize_data_store(self, project_id, data_store_id, waize_gcs_uri):
         """
         Imports documents from a GCS location to Google Discovery Engine using the provided JSONL file.
@@ -524,10 +498,9 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             data_store_id: The ID of the data store in Discovery Engine.
             waize_gcs_uri: The GCS URI of the JSONL file containing the documents to import.
         """
-
+        print(f"Importing the Documents to Data Store: {data_store_id}...")
         url = f"https://discoveryengine.googleapis.com/v1/projects/{project_id}/locations/global/collections/default_collection/dataStores/{data_store_id}/branches/0/documents:import"
 
-        # Get authentication token using gcloud credentials
         auth_token = subprocess.check_output("gcloud auth print-access-token", shell=True, text=True).strip()
 
         headers = {
@@ -540,12 +513,19 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         response = requests.post(url, headers=headers, json=data)
 
         if response.status_code == 200:
-            print(f"Documents imported successfully to Discovery Engine Data Store: {data_store_id}")
+            print(f"Documents Import Job successfully started to Discovery Engine Data Store: {data_store_id}")
         else:
             print(f"Error importing documents: {response.status_code}, {response.text}")
-        return data_store_id
 
-    @trace_on("Creating VAIS Endpoint", measure_time=True)
+        delay_factor = 2
+        while True:
+            if self.__import_finished(project_id, data_store_id):
+                return data_store_id
+            else:
+                time.sleep(delay_factor)
+                delay_factor = min(delay_factor**2, 300)
+                print(f"Documents Import Job is in progress, rechecking again in {delay_factor} seconds...")
+
     def __create_waize_app(self, project_id, dataset_name, data_store_id):
         """
         Creates a Google Discovery Engine application with the specified settings.
@@ -555,13 +535,11 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             dataset_name: A name to incorporate into the generated app ID and name.
             data_store_id: The ID of the data store to associate with the engine.
         """
-
-        # Generate random string for uniqueness
+        print("Creating the VAIS endpoint...")
         random_suffix = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
         app_id = f"{dataset_name}-{random_suffix}"
         app_name = f"{dataset_name.capitalize()} Search App ({random_suffix})"
 
-        # Get authentication token using gcloud credentials
         auth_token = subprocess.check_output("gcloud auth print-access-token", shell=True, text=True).strip()
 
         url = f"https://discoveryengine.googleapis.com/v1/projects/{project_id}/locations/global/collections/default_collection/engines?engineId={app_id}"
@@ -577,7 +555,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             "dataStoreIds": [data_store_id],
             "solutionType": "SOLUTION_TYPE_SEARCH",
             "searchEngineConfig": {
-                "searchTier": "SEARCH_TIER_STANDARD",
+                "searchTier": "SEARCH_TIER_ENTERPRISE",
                 "searchAddOns": ["SEARCH_ADD_ON_LLM"],
             },
         }
