@@ -12,25 +12,31 @@ This module provides classes and functions for:
 """
 
 import glob
+import json
 import os
 import random
 import shutil
 import string
+import subprocess
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 import pandas as pd
+import requests
 from google.api_core.client_options import ClientOptions
-from google.cloud import aiplatform
+from google.auth.transport.requests import Request
+from google.cloud import aiplatform, discoveryengine
 from google.cloud import discoveryengine_v1 as discoveryengine
 from google.cloud import storage
+from google.oauth2 import id_token
 from langchain.schema import Document
 from langchain.schema.embeddings import Embeddings
 from langchain.vectorstores import Chroma
 
 from gen_ai.common.common import default_extract_data
 from gen_ai.common.inverted_index import InvertedIndex
+from gen_ai.common.measure_utils import trace_on
 from gen_ai.common.storage import Storage
 
 
@@ -331,13 +337,258 @@ class VertexAISearchVectorStrategy(VectorStrategy):
     def __init__(self, storage_interface: Storage, config: dict[str, str], vectore_store_path: str) -> None:
         super().__init__(storage_interface, config)
         self.vectore_store_path = f"{vectore_store_path}_vais"
-        self.project_id = config.get("bq_project_id")
-        self.engine_id = config.get("vais_engine_id", None)
+        self.config = config
 
     def get_vector_indices(
         self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str
     ):
-        return VertexAISearchVectorStore(self.project_id, self.engine_id)
+        aiplatform.init()
+        if not os.path.exists(self.vectore_store_path):
+            print("No VAIS vector store found, creating one...")
+            original_bucket = self.config.get("gcs_source_bucket")
+            dataset_name = self.config.get("dataset_name")
+            project_id = self.config.get("bq_project_id")
+
+            output_jsonl_path, new_bucket_name = self.__prepare_waize_format(original_bucket, dataset_name)
+            waize_gcs_uri = self.__copy_to_waize_bucket(original_bucket, new_bucket_name, output_jsonl_path)
+            waize_data_store = self.__create_waize_data_store(project_id, dataset_name)
+            waize_data_store = self.__import_data_to_waize_data_store(project_id, waize_data_store, waize_gcs_uri)
+            waize_engine_id = self.__create_waize_app(project_id, dataset_name, waize_data_store)
+            self.__serialize_engine_id(waize_engine_id, waize_data_store, waize_gcs_uri)
+        else:
+            print("VAIS vector store exists, retrieving the values...")
+            waize_engine_id = self.__deserialize_engine_id()
+
+        return VertexAISearchVectorStore(self.project_id, waize_engine_id)
+
+    def __deserialize_engine_id(self):
+        vais_path = os.path.join(self.vector_store_path, "vais_urls.json")
+        with open(vais_path, "r") as f:
+            vais_urls = json.load(f)
+        print(f"VAIS urls are: \n {vais_urls}")
+        return vais_urls["vais_engine_id"]
+
+    def __serialize_engine_id(self, waize_engine_id, waize_data_store, waize_gcs_uri):
+        os.mkdir(self.vector_store_path, exist_ok=True)
+        vais_path = os.path.join(self.vector_store_path, "vais_urls.json")
+        vais_urls = {
+            "vais_engine_id": waize_engine_id,
+            "vais_data_store": waize_data_store,
+            "vais_gcs_uri": waize_gcs_uri,
+        }
+        with open(vais_path, "w") as f:
+            json.dump(vais_urls, f)
+
+        print(f"Saved VAIS urls to {vais_path}")
+        print(f"VAIS urls are: \n {vais_urls}")
+
+    @trace_on("Preparing for VAIS format", measure_time=True)
+    def __prepare_waize_format(self, bucket_name, dataset_name):
+        """
+        Creates a JSONL file from pairs of .txt and _metadata.json files in a GCS bucket.
+
+        Args:
+            bucket_name: The name of the GCS bucket to process.
+        """
+
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name)
+
+        random_suffix = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
+        new_bucket_name = f"{bucket_name}-{dataset_name}-jsonl-{random_suffix}"
+
+        # Get all blobs
+        all_blobs = list(bucket.list_blobs())
+
+        # Filter for JSON metadata files
+        json_blobs = [blob for blob in all_blobs if blob.name.endswith("_metadata.json")]
+        jsonl_data = []
+        for i, json_blob in enumerate(json_blobs):
+            # Extract file name base (without _metadata.json)
+            file_name_base = json_blob.name[:-14]  # Remove "_metadata.json"
+
+            # Check for matching TXT file
+            txt_blob = bucket.blob(f"{file_name_base}.txt")
+            if not txt_blob.exists():
+                continue  # Skip if no matching TXT file
+
+            # Load JSON metadata
+            metadata = json.loads(json_blob.download_as_text())
+            metadata_str = json.dumps(metadata)
+            # Create JSONL entry
+            jsonl_entry = {
+                "id": str(i),
+                "jsonData": metadata_str,
+                "content": {"mimeType": "text/plain", "uri": f"gs://{new_bucket_name}/data/{txt_blob.name}"},
+            }
+            jsonl_data.append(jsonl_entry)
+
+        # Write to a JSONL file (locally or to GCS)
+        with open("output.jsonl", "w") as outfile:
+            for entry in jsonl_data:
+                outfile.write(json.dumps(entry) + "\n")
+
+        return "output.jsonl", new_bucket_name
+
+    @trace_on("Creating the bucket for VAIS", measure_time=True)
+    def __copy_to_waize_bucket(self, original_bucket_name, new_bucket_name, output_jsonl_path):
+        """
+        Creates a new bucket, copies TXT files to a 'data' subfolder, and places the output.jsonl in the bucket.
+
+        Args:
+            original_bucket_name: The name of the GCS bucket where the original files reside.
+            new_bucket_name: The name of the new GCS bucket
+            output_jsonl_path: The path to the JSONL file
+        """
+
+        storage_client = storage.Client()
+        new_bucket = storage_client.bucket(new_bucket_name)
+        original_bucket = storage_client.bucket(original_bucket_name)
+
+        # Create the new bucket (only if it doesn't exist)
+        if not new_bucket.exists():
+            new_bucket.create()
+            print(f"Created bucket: gs://{new_bucket_name}")
+
+        txt_blobs = [blob for blob in original_bucket.list_blobs() if blob.name.endswith(".txt")]
+
+        for txt_blob in txt_blobs:
+            # Download TXT file to a temporary local file
+            try:
+                local_txt_path = f"/tmp/{txt_blob.name}"  # Using a temporary directory
+                txt_blob.download_to_filename(local_txt_path)
+
+                # Upload TXT file to the new bucket
+                new_blob = new_bucket.blob(f"data/{txt_blob.name}")
+                new_blob.upload_from_filename(local_txt_path)
+
+            except Exception as e:
+                print(f"Error processing file {txt_blob.name}: {e}")
+            finally:
+                # Clean up the temporary file
+                if os.path.exists(local_txt_path):
+                    os.remove(local_txt_path)
+
+        # Copy output.jsonl to the new bucket
+        output_blob = new_bucket.blob("output.jsonl")  # Place in root of the bucket
+        output_blob.upload_from_filename(output_jsonl_path)
+        print(f"Copied output.jsonl to: gs://{new_bucket_name}/output.jsonl")
+
+        return new_bucket_name
+
+    @trace_on("Creating the Data Store for VAIS", measure_time=True)
+    def __create_waize_data_store(self, project_id, dataset_name):
+        """Sends an API request to create a data store in Google Discovery Engine.
+
+        Args:
+            project_id (str): The ID of your Google Cloud project.
+
+        Returns:
+            requests.Response: The response object from the API request.
+        """
+        random_suffix = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
+        new_data_store = f"data_store-{dataset_name}-{random_suffix}"
+
+        # Get access token using gcloud CLI
+        access_token = subprocess.check_output("gcloud auth print-access-token", shell=True, text=True).strip()
+
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+            "X-Goog-User-Project": project_id,
+        }
+
+        url = f"https://discoveryengine.googleapis.com/v1alpha/projects/{project_id}/locations/global/collections/default_collection/dataStores?dataStoreId={new_data_store}"
+
+        data = {
+            "displayName": "the_store",
+            "industryVertical": "GENERIC",
+            "solutionTypes": ["SOLUTION_TYPE_SEARCH"],
+            "contentConfig": "CONTENT_REQUIRED",
+        }
+
+        response = requests.post(url, headers=headers, json=data)
+
+        # Check for errors
+        response.raise_for_status()
+
+        return new_data_store
+
+    @trace_on("Importing Documents to the Data Store for VAIS", measure_time=True)
+    def __import_data_to_waize_data_store(self, project_id, data_store_id, waize_gcs_uri):
+        """
+        Imports documents from a GCS location to Google Discovery Engine using the provided JSONL file.
+
+        Args:
+            project_id: The ID of your Google Cloud Project.
+            data_store_id: The ID of the data store in Discovery Engine.
+            waize_gcs_uri: The GCS URI of the JSONL file containing the documents to import.
+        """
+
+        url = f"https://discoveryengine.googleapis.com/v1/projects/{project_id}/locations/global/collections/default_collection/dataStores/{data_store_id}/branches/0/documents:import"
+
+        # Get authentication token using gcloud credentials
+        auth_token = subprocess.check_output("gcloud auth print-access-token", shell=True, text=True).strip()
+
+        headers = {
+            "Authorization": f"Bearer {auth_token}",
+            "Content-Type": "application/json",
+        }
+
+        data = {"gcsSource": {"inputUris": [f"gs://{waize_gcs_uri}/*.jsonl"]}}
+
+        response = requests.post(url, headers=headers, json=data)
+
+        if response.status_code == 200:
+            print(f"Documents imported successfully to Discovery Engine Data Store: {data_store_id}")
+        else:
+            print(f"Error importing documents: {response.status_code}, {response.text}")
+        return data_store_id
+
+    @trace_on("Creating VAIS Endpoint", measure_time=True)
+    def __create_waize_app(self, project_id, dataset_name, data_store_id):
+        """
+        Creates a Google Discovery Engine application with the specified settings.
+
+        Args:
+            project_id: The ID of your Google Cloud Project.
+            dataset_name: A name to incorporate into the generated app ID and name.
+            data_store_id: The ID of the data store to associate with the engine.
+        """
+
+        # Generate random string for uniqueness
+        random_suffix = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
+        app_id = f"{dataset_name}-{random_suffix}"
+        app_name = f"{dataset_name.capitalize()} Search App ({random_suffix})"
+
+        # Get authentication token using gcloud credentials
+        auth_token = subprocess.check_output("gcloud auth print-access-token", shell=True, text=True).strip()
+
+        url = f"https://discoveryengine.googleapis.com/v1/projects/{project_id}/locations/global/collections/default_collection/engines?engineId={app_id}"
+
+        headers = {
+            "Authorization": f"Bearer {auth_token}",
+            "Content-Type": "application/json",
+            "X-Goog-User-Project": project_id,
+        }
+
+        data = {
+            "displayName": app_name,
+            "dataStoreIds": [data_store_id],
+            "solutionType": "SOLUTION_TYPE_SEARCH",
+            "searchEngineConfig": {
+                "searchTier": "SEARCH_TIER_STANDARD",
+                "searchAddOns": ["SEARCH_ADD_ON_LLM"],
+            },
+        }
+
+        response = requests.post(url, headers=headers, json=data)
+
+        if response.status_code == 200:
+            print(f"Discovery Engine application '{app_name}' (ID: {app_id}) created successfully.")
+        else:
+            print(f"Error creating application: {response.status_code}, {response.text}")
+        return app_id
 
 
 class VertexAIVectorStrategy(VectorStrategy):
