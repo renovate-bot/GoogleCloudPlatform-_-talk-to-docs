@@ -179,10 +179,44 @@ class VertexVectorStore(VectorStore):
 
 
 class VertexAISearchVectorStore(VectorStore):
-    """Concrete implementation of VectorStore using Vertex AI Search for vector storage and search.
-    # Important: VAIS (VertexAIVectorStore) and VVS (VertexVectorStore) are DIFFERENT THINGS
+    """VectorStore implementation utilizing Vertex AI Search for storage and retrieval.
+
+    This class seamlessly integrates with Vertex AI Search (VAIS), Google's powerful
+    search and recommendation platform, to store and retrieve documents based on
+    semantic similarity.
+
+    **Key Features:**
+
+    * **Semantic Search:** Employs VAIS's advanced algorithms to understand the meaning of queries and documents, leading to more relevant results.
+    * **Filtering:** Supports filtering documents during retrieval, allowing for targeted search results based on metadata.
+    * **Query Expansion:** Leverages VAIS's query expansion capabilities to automatically broaden searches and improve recall.
+    * **Spell Correction:** Automatically corrects spelling errors in queries to enhance search accuracy.
+
+    **Note:** This class is distinct from `VertexVectorStore`.
+              Ensure you are using the correct one based on your needs.
+
+    Args:
+        project_id (str): Your Google Cloud Project ID.
+        engine_id (str): The ID of your Vertex AI Search engine.
+        location (str, optional): The location of your Vertex AI Search engine (defaults to "global").
+
     Attributes:
-        chroma (Chroma): The Chroma instance for managing the vector store.
+        project_id (str): The Google Cloud Project ID.
+        location (str): The location of the Vertex AI Search engine.
+        engine_id (str): The ID of the Vertex AI Search engine.
+
+    Methods:
+        _search_sample(project_id, location, engine_id, search_query, k, filter, **kwargs):
+            Internal method to perform a search using Vertex AI Search.
+
+        similarity_search_with_score(query, k=4, filter=None, **kwargs):
+            Performs a semantic search with scores for relevance.
+
+        similarity_search(query, k=4, filter=None, **kwargs):
+            Performs a semantic search without scores (delegates to `similarity_search_with_score`).
+
+        max_marginal_relevance_search(query, k=4, fetch_k=20, lambda_mult=0.5, **kwargs):
+            Currently not implemented.
     """
 
     def __init__(self, project_id: str, engine_id: str):
@@ -200,6 +234,24 @@ class VertexAISearchVectorStore(VectorStore):
         filter=filter,
         **kwargs,  # pylint: disable=unused-argument
     ) -> List[discoveryengine.SearchResponse]:
+        """Internal method to perform a raw search using Vertex AI Search.
+
+        This method interacts with the Vertex AI Search API to retrieve documents
+        relevant to the given search query. It returns a list of tuples, each
+        containing a Document object and its relevance score.
+
+        Args:
+            project_id (str): Your Google Cloud Project ID.
+            location (str): The location of your Vertex AI Search engine.
+            engine_id (str): The ID of your Vertex AI Search engine.
+            search_query (str): The text query to search for.
+            k (int, optional): The number of results to return (defaults to 4).
+            filter (str, optional): A filter expression to narrow down results.
+
+        Returns:
+            List[Tuple[Document, float]]: A list of tuples where each tuple contains a Document
+                                         and its corresponding relevance score.
+        """
         client_options = (
             ClientOptions(api_endpoint=f"{location}-discoveryengine.googleapis.com") if location != "global" else None
         )
@@ -258,7 +310,17 @@ class VertexAISearchVectorStore(VectorStore):
         return docs
 
     def similarity_search_with_score(self, query: str, k: int = 4, filter: str = None, **kwargs):
+        """Performs a semantic similarity search and returns results with scores.
 
+        Args:
+            query (str): The query text to search for.
+            k (int, optional): The number of top results to return (defaults to 4).
+            filter (str, optional): A filter expression to apply to the search.
+
+        Returns:
+            List[Tuple[Document, float]]: A list of tuples where each tuple contains a Document
+                                         and its relevance score (higher is more relevant).
+        """
         return self._search_sample(
             project_id=self.project_id,
             location=self.location,
@@ -269,12 +331,26 @@ class VertexAISearchVectorStore(VectorStore):
             **kwargs,
         )
 
-    def similarity_search(self, query: str, k: int = 4, **kwargs):
-        return self.similarity_search_with_score(query, k)
+    def similarity_search(self, query: str, k: int = 4, filter: str = None, **kwargs):
+        """Performs a semantic similarity search and returns documents only.
+
+        This method is a convenience wrapper around `similarity_search_with_score` that
+        discards the relevance scores.
+
+        Args:
+            query (str): The query text to search for.
+            k (int, optional): The number of top results to return (defaults to 4).
+            filter (str, optional): A filter expression to apply to the search.
+
+        Returns:
+            List[Document]: A list of the most relevant documents to the query.
+        """
+        return self.similarity_search_with_score(query, k, filter)
 
     def max_marginal_relevance_search(
         self, query: str, k: int = 4, fetch_k: int = 20, lambda_mult: float = 0.5, **kwargs
     ):
+        """Not currently implemented."""
         return []
 
 
@@ -335,7 +411,27 @@ class ChromaVectorStrategy(VectorStrategy):
 
 
 class VertexAISearchVectorStrategy(VectorStrategy):
-    """Concrete implementation of VectorStrategy for using Vertex AI Search as the vector store."""
+    """Strategy to use Vertex AI Search (VAIS) as the vector store for document retrieval.
+
+    This class handles the setup and interaction with Vertex AI Search to store
+    document embeddings and perform semantic searches. It provides functionality to:
+
+    * **Prepare data:** Convert documents into the format required by VAIS.
+    * **Create resources:** Create data stores and search engines on VAIS.
+    * **Manage VAIS configuration:** Serialize and deserialize VAIS engine IDs for persistence.
+    * **Integrate with LlamaIndex:** Provide a `VertexAISearchVectorStore` instance for document retrieval.
+
+    Args:
+        storage_interface (Storage): The LlamaIndex storage interface for data persistence.
+        config (Dict[str, str]): Configuration dictionary containing:
+            * "dataset_name": The name for the VAIS dataset.
+            * "bq_project_id": The Google Cloud project ID for Vertex AI and BigQuery.
+        vectore_store_path (str): The base directory to store VAIS configuration.
+
+    Attributes:
+        vectore_store_path (str): The directory to store VAIS configuration.
+        config (Dict[str, str]): The configuration dictionary.
+    """
 
     def __init__(self, storage_interface: Storage, config: dict[str, str], vectore_store_path: str) -> None:
         super().__init__(storage_interface, config)
@@ -345,6 +441,20 @@ class VertexAISearchVectorStrategy(VectorStrategy):
     def get_vector_indices(
         self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str
     ):
+        """Gets or creates a VertexAISearchVectorStore instance.
+
+        If a VAIS engine exists in the `vectore_store_path`, it will be loaded.
+        Otherwise, a new engine will be created using the provided configuration and data.
+
+        Args:
+            regenerate (bool): Unused argument (kept for compatibility with base class).
+            embeddings (Embeddings): Unused argument (kept for compatibility with base class).
+            vector_indices (Dict[str, str]): Unused argument (kept for compatibility with base class).
+            processed_files_dir (str): The directory containing processed files for VAIS.
+
+        Returns:
+            VertexAISearchVectorStore: A Vertex AI Search-backed vector store instance.
+        """
         aiplatform.init()
         if not os.path.exists(self.vectore_store_path):
             print("No VAIS vector store found, creating one...")
@@ -363,6 +473,11 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         return VertexAISearchVectorStore(self.config.get("bq_project_id"), waize_engine_id)
 
     def __deserialize_engine_id(self):
+        """Deserializes the VAIS engine ID from a JSON file.
+
+        Returns:
+            str: The VAIS engine ID.
+        """
         vais_path = os.path.join(self.vectore_store_path, "vais_urls.json")
         with open(vais_path, "r") as f:
             vais_urls = json.load(f)
@@ -370,6 +485,13 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         return vais_urls["vais_engine_id"]
 
     def __serialize_engine_id(self, waize_engine_id, waize_data_store, waize_gcs_uri):
+        """Serializes the VAIS engine ID and related URLs to a JSON file.
+
+        Args:
+            waize_engine_id (str): The VAIS engine ID.
+            waize_data_store (str): The VAIS data store ID.
+            waize_gcs_uri (str): The GCS URI of the JSONL data.
+        """
         os.makedirs(self.vectore_store_path, exist_ok=True)
         vais_path = os.path.join(self.vectore_store_path, "vais_urls.json")
         vais_urls = {
@@ -384,13 +506,16 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         print(f"VAIS urls are: \n {vais_urls}")
 
     def __prepare_waize_format(self, processed_dir, dataset_name):
-        """
-        Creates a JSONL file from pairs of .txt and _metadata.json files in a local directory
-        and uploads them to a new GCS bucket.
+        """Prepares data for VAIS import.
+
+        Creates a JSONL file from processed files and uploads it to a new GCS bucket.
 
         Args:
-            processed_dir: The local directory containing the processed files.
-            dataset_name: The name to use for the dataset.
+            processed_dir (str): The directory containing processed files.
+            dataset_name (str): The name to use for the dataset.
+
+        Returns:
+            str: The name of the new GCS bucket.
         """
         print("Preparing format for VAIS...")
         storage_client = storage.Client()
@@ -435,13 +560,14 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         return new_bucket_name
 
     def __create_waize_data_store(self, project_id, dataset_name):
-        """Sends an API request to create a data store in Google Discovery Engine.
+        """Creates a data store in Vertex AI Search.
 
         Args:
-            project_id (str): The ID of your Google Cloud project.
+            project_id (str): The Google Cloud project ID.
+            dataset_name (str): A name to incorporate into the data store ID.
 
         Returns:
-            requests.Response: The response object from the API request.
+            str: The ID of the created data store.
         """
         print("Creating the Data Store for VAIS...")
         random_suffix = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
@@ -472,6 +598,15 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         return new_data_store
 
     def __import_finished(self, project_id: str, data_store_id: str):
+        """Checks if the import to the Vertex AI Search data store is finished.
+
+        Args:
+            project_id (str): The Google Cloud project ID.
+            data_store_id (str): The ID of the data store.
+
+        Returns:
+            bool: True if import is finished, False otherwise.
+        """
         client_options = None
         client = discoveryengine.DocumentServiceClient(client_options=client_options)
         parent = client.branch_path(
@@ -490,13 +625,15 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             return False
 
     def __import_data_to_waize_data_store(self, project_id, data_store_id, waize_gcs_uri):
-        """
-        Imports documents from a GCS location to Google Discovery Engine using the provided JSONL file.
+        """Imports data to the Vertex AI Search data store from GCS.
 
         Args:
-            project_id: The ID of your Google Cloud Project.
-            data_store_id: The ID of the data store in Discovery Engine.
-            waize_gcs_uri: The GCS URI of the JSONL file containing the documents to import.
+            project_id (str): The Google Cloud project ID.
+            data_store_id (str): The ID of the data store.
+            waize_gcs_uri (str): The GCS URI of the JSONL data to import.
+
+        Returns:
+            str: The ID of the data store.
         """
         print(f"Importing the Documents to Data Store: {data_store_id}...")
         url = f"https://discoveryengine.googleapis.com/v1/projects/{project_id}/locations/global/collections/default_collection/dataStores/{data_store_id}/branches/0/documents:import"
@@ -527,13 +664,15 @@ class VertexAISearchVectorStrategy(VectorStrategy):
                 print(f"Documents Import Job is in progress, rechecking again in {delay_factor} seconds...")
 
     def __create_waize_app(self, project_id, dataset_name, data_store_id):
-        """
-        Creates a Google Discovery Engine application with the specified settings.
+        """Creates a Vertex AI Search engine.
 
         Args:
-            project_id: The ID of your Google Cloud Project.
-            dataset_name: A name to incorporate into the generated app ID and name.
-            data_store_id: The ID of the data store to associate with the engine.
+            project_id (str): The Google Cloud project ID.
+            dataset_name (str): A name to incorporate into the engine ID and display name.
+            data_store_id (str): The ID of the data store to associate with the engine.
+
+        Returns:
+            str: The ID of the created engine.
         """
         print("Creating the VAIS endpoint...")
         random_suffix = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
