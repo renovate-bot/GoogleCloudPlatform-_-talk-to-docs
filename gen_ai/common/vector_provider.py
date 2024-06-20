@@ -21,17 +21,15 @@ import subprocess
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List
 
 import pandas as pd
 import requests
 import tqdm
 from google.api_core.client_options import ClientOptions
-from google.auth.transport.requests import Request
-from google.cloud import aiplatform, discoveryengine
+from google.cloud import aiplatform
 from google.cloud import discoveryengine_v1 as discoveryengine
 from google.cloud import storage
-from google.oauth2 import id_token
 from langchain.schema import Document
 from langchain.schema.embeddings import Embeddings
 from langchain.vectorstores import Chroma
@@ -187,9 +185,12 @@ class VertexAISearchVectorStore(VectorStore):
 
     **Key Features:**
 
-    * **Semantic Search:** Employs VAIS's advanced algorithms to understand the meaning of queries and documents, leading to more relevant results.
-    * **Filtering:** Supports filtering documents during retrieval, allowing for targeted search results based on metadata.
-    * **Query Expansion:** Leverages VAIS's query expansion capabilities to automatically broaden searches and improve recall.
+    * **Semantic Search:** Employs VAIS's advanced algorithms to understand the meaning of queries and documents,
+    leading to more relevant results.
+    * **Filtering:** Supports filtering documents during retrieval, allowing for targeted search results
+    based on metadata.
+    * **Query Expansion:** Leverages VAIS's query expansion capabilities to automatically broaden searches
+    and improve recall.
     * **Spell Correction:** Automatically corrects spelling errors in queries to enhance search accuracy.
 
     **Note:** This class is distinct from `VertexVectorStore`.
@@ -231,7 +232,7 @@ class VertexAISearchVectorStore(VectorStore):
         engine_id: str,
         search_query: str,
         k: int = 4,
-        filter=filter,
+        filter=filter,  # pylint: disable=redefined-builtin
         **kwargs,  # pylint: disable=unused-argument
     ) -> List[discoveryengine.SearchResponse]:
         """Internal method to perform a raw search using Vertex AI Search.
@@ -286,7 +287,7 @@ class VertexAISearchVectorStore(VectorStore):
             query=search_query,
             page_size=min(10, k),
             content_search_spec=content_search_spec,
-            filter=filter,
+            filter=filter,  # pylint: disable=redefined-builtin
             query_expansion_spec=discoveryengine.SearchRequest.QueryExpansionSpec(
                 condition=discoveryengine.SearchRequest.QueryExpansionSpec.Condition.AUTO,
             ),
@@ -309,7 +310,9 @@ class VertexAISearchVectorStore(VectorStore):
             docs.append((doc, score))
         return docs
 
-    def similarity_search_with_score(self, query: str, k: int = 4, filter: str = None, **kwargs):
+    def similarity_search_with_score(
+        self, query: str, k: int = 4, filter: str = None, **kwargs
+    ):  # pylint: disable=redefined-builtin
         """Performs a semantic similarity search and returns results with scores.
 
         Args:
@@ -331,7 +334,7 @@ class VertexAISearchVectorStore(VectorStore):
             **kwargs,
         )
 
-    def similarity_search(self, query: str, k: int = 4, filter: str = None, **kwargs):
+    def similarity_search(self, query: str, k: int = 4, filter: str = None, **kwargs): # pylint: disable=redefined-builtin
         """Performs a semantic similarity search and returns documents only.
 
         This method is a convenience wrapper around `similarity_search_with_score` that
@@ -437,6 +440,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         super().__init__(storage_interface, config)
         self.vectore_store_path = f"{vectore_store_path}_vais"
         self.config = config
+        self.base_url = "https://discoveryengine.googleapis.com/v1"
 
     def get_vector_indices(
         self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str
@@ -479,7 +483,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             str: The VAIS engine ID.
         """
         vais_path = os.path.join(self.vectore_store_path, "vais_urls.json")
-        with open(vais_path, "r") as f:
+        with open(vais_path, "r", encoding="utf-8") as f:
             vais_urls = json.load(f)
         print(f"VAIS urls are: \n {vais_urls}")
         return vais_urls["vais_engine_id"]
@@ -499,7 +503,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             "vais_data_store": waize_data_store,
             "vais_gcs_uri": waize_gcs_uri,
         }
-        with open(vais_path, "w") as f:
+        with open(vais_path, "w", encoding="utf-8") as f:
             json.dump(vais_urls, f)
 
         print(f"Saved VAIS urls to {vais_path}")
@@ -536,7 +540,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
                     continue  # Skip if no matching TXT file
 
                 metadata_path = os.path.join(processed_dir, filename)
-                with open(metadata_path, "r") as metadata_file:
+                with open(metadata_path, "r", encoding="utf-8") as metadata_file:
                     metadata = json.load(metadata_file)
                 metadata_str = json.dumps(metadata)
 
@@ -551,7 +555,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
                 jsonl_data.append(jsonl_entry)
 
         jsonl_path = "output.jsonl"
-        with open(jsonl_path, "w") as outfile:
+        with open(jsonl_path, "w", encoding="utf-8") as outfile:
             for entry in jsonl_data:
                 outfile.write(json.dumps(entry) + "\n")
             jsonl_blob = new_bucket.blob(jsonl_path)
@@ -582,7 +586,11 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             "X-Goog-User-Project": project_id,
         }
 
-        url = f"https://discoveryengine.googleapis.com/v1alpha/projects/{project_id}/locations/global/collections/default_collection/dataStores?dataStoreId={new_data_store}"
+        url = (
+            f"https://discoveryengine.googleapis.com/v1alpha/projects/{project_id}/"
+            f"locations/global/collections/default_collection/dataStores"
+            f"?dataStoreId={new_data_store}"
+        )
 
         data = {
             "displayName": f"{new_data_store_name}",
@@ -591,7 +599,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             "contentConfig": "CONTENT_REQUIRED",
         }
 
-        response = requests.post(url, headers=headers, json=data)
+        response = requests.post(url, headers=headers, json=data, timeout=3600)
 
         response.raise_for_status()
 
@@ -620,7 +628,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             response = client.list_documents(parent=parent)
             if len(list(response)) > 0:
                 return True
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             print(f"Error: {e}")
             return False
 
@@ -636,7 +644,10 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             str: The ID of the data store.
         """
         print(f"Importing the Documents to Data Store: {data_store_id}...")
-        url = f"https://discoveryengine.googleapis.com/v1/projects/{project_id}/locations/global/collections/default_collection/dataStores/{data_store_id}/branches/0/documents:import"
+        url = (
+            f"{self.base_url}/projects/{project_id}/locations/global/collections/default_collection/"
+            f"dataStores/{data_store_id}/branches/0/documents:import"
+        )
 
         auth_token = subprocess.check_output("gcloud auth print-access-token", shell=True, text=True).strip()
 
@@ -647,7 +658,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
 
         data = {"gcsSource": {"inputUris": [f"gs://{waize_gcs_uri}/*.jsonl"]}}
 
-        response = requests.post(url, headers=headers, json=data)
+        response = requests.post(url, headers=headers, json=data, timeout=3600)
 
         if response.status_code == 200:
             print(f"Documents Import Job successfully started to Discovery Engine Data Store: {data_store_id}")
@@ -681,8 +692,10 @@ class VertexAISearchVectorStrategy(VectorStrategy):
 
         auth_token = subprocess.check_output("gcloud auth print-access-token", shell=True, text=True).strip()
 
-        url = f"https://discoveryengine.googleapis.com/v1/projects/{project_id}/locations/global/collections/default_collection/engines?engineId={app_id}"
-
+        url = (
+            f"{self.base_url}/projects/{project_id}/locations/global/collections/"
+            f"default_collection/engines?engineId={app_id}"
+        )
         headers = {
             "Authorization": f"Bearer {auth_token}",
             "Content-Type": "application/json",
@@ -699,7 +712,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             },
         }
 
-        response = requests.post(url, headers=headers, json=data)
+        response = requests.post(url, headers=headers, json=data, timeout=3600)
 
         if response.status_code == 200:
             print(f"Discovery Engine application '{app_name}' (ID: {app_id}) created successfully.")

@@ -9,15 +9,19 @@ vector store based on semantic similarity to a provided query, potentially filte
 additional metadata criteria. It leverages similarity search and max marginal relevance
 techniques to find and rank documents according to their relevance.
 """
-from abc import ABC, abstractmethod
+
 import copy
+from abc import ABC, abstractmethod
+from typing import Any
+
 from langchain_community.vectorstores.chroma import Chroma
 from langchain_core.documents.base import Document
-from typing import Any
+
 import gen_ai.common.common as common
-from gen_ai.common.measure_utils import trace_on
-from gen_ai.common.chroma_utils import convert_to_chroma_format, convert_to_vais_format
+from gen_ai.common.chroma_utils import (convert_to_chroma_format,
+                                        convert_to_vais_format)
 from gen_ai.common.ioc_container import Container
+from gen_ai.common.measure_utils import trace_on
 
 
 def remove_member_and_session_id(metadata: dict[str, Any]) -> dict[str, Any]:
@@ -99,12 +103,11 @@ class SemanticDocumentRetriever(DocumentRetriever):
         if metadata is None:
             metadata = {}
         metadata = remove_member_and_session_id(metadata)
-        if Container.config.get('vector_name')=='chroma':
+        if Container.config.get("vector_name") == "chroma":
             if metadata is not None and len(metadata) > 1:
                 metadata = convert_to_chroma_format(metadata)
-        elif Container.config.get('vector_name')=='vais':
-                metadata = convert_to_vais_format(metadata)
-
+        elif Container.config.get("vector_name") == "vais":
+            metadata = convert_to_vais_format(metadata)
 
         ss_docs = store.similarity_search_with_score(query=questions_for_search, k=50, filter=metadata)
         max_number_of_docs_retrieved = Container.config.get("max_number_of_docs_retrieved", 3)
@@ -127,5 +130,3 @@ class SemanticDocumentRetriever(DocumentRetriever):
         self, store: Chroma, questions_for_search: str, metadata: dict[str, str] | None = None
     ) -> list[Document]:
         return self._get_related_docs_from_store(store, questions_for_search, metadata)
-
-

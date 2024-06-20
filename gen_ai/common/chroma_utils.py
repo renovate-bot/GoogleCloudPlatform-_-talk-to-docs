@@ -28,6 +28,7 @@ def convert_to_chroma_format(metadata: dict[str, str]) -> dict[str, dict[str, st
     """
     return {"$and": [{k: v} for k, v in metadata.items()]}
 
+
 def convert_to_vais_format(metadata: dict[str, str]) -> str:
     """
     Converts a metadata dictionary into a Vertex AI Search filter string,
@@ -45,8 +46,8 @@ def convert_to_vais_format(metadata: dict[str, str]) -> str:
             if isinstance(value, (int, float)):
                 filters.append(f"{key} = {value}")
             elif isinstance(value, bool):
-                filters.append(f"{key} = \"{str(value).lower()}\"")
+                filters.append(f'{key} = "{str(value).lower()}"')
             else:
-                filters.append(f'{key}: ANY("{value}")')  
+                filters.append(f'{key}: ANY("{value}")')
 
-    return ' AND '.join(filters)
+    return " AND ".join(filters)
