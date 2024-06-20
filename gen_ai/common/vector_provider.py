@@ -37,6 +37,7 @@ from langchain.vectorstores import Chroma
 from gen_ai.common.common import default_extract_data
 from gen_ai.common.inverted_index import InvertedIndex
 from gen_ai.common.storage import Storage
+from gen_ai.common.chroma_utils import map_composite_to_dict
 
 
 @dataclass
@@ -303,10 +304,8 @@ class VertexAISearchVectorStore(VectorStore):
             content = item.document.derived_struct_data["extractive_segments"][0]["content"]
             score = item.document.derived_struct_data["extractive_segments"][0]["relevanceScore"]
             doc = Document(page_content=content)
-            doc.metadata = {
-                "original_filepath": item.document.derived_struct_data["title"],
-                "section_name": item.document.derived_struct_data["title"],
-            }
+            struct_data_dict = map_composite_to_dict(item.document.struct_data)
+            doc.metadata = struct_data_dict
             docs.append((doc, score))
         return docs
 
