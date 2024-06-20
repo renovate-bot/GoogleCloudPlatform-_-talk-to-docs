@@ -472,7 +472,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             waize_engine_id = self.__create_waize_app(project_id, dataset_name, waize_data_store)
             self.__serialize_engine_id(waize_engine_id, waize_data_store, waize_gcs_uri)
             print("VAIS vector store created successfully... waiting for Enterprise Features Activation")
-            time.sleep(30)
+            time.sleep(90) # timeout for enterprise features to activate. Talk to Hossein about it
         else:
             print("VAIS vector store exists, retrieving the values...")
         waize_engine_id = self.__deserialize_engine_id()
