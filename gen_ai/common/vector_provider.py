@@ -333,7 +333,9 @@ class VertexAISearchVectorStore(VectorStore):
             **kwargs,
         )
 
-    def similarity_search(self, query: str, k: int = 4, filter: str = None, **kwargs): # pylint: disable=redefined-builtin
+    def similarity_search(
+        self, query: str, k: int = 4, filter: str = None, **kwargs
+    ):  # pylint: disable=redefined-builtin
         """Performs a semantic similarity search and returns documents only.
 
         This method is a convenience wrapper around `similarity_search_with_score` that
@@ -469,9 +471,11 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             waize_data_store = self.__import_data_to_waize_data_store(project_id, waize_data_store, waize_gcs_uri)
             waize_engine_id = self.__create_waize_app(project_id, dataset_name, waize_data_store)
             self.__serialize_engine_id(waize_engine_id, waize_data_store, waize_gcs_uri)
+            print("VAIS vector store created successfully... waiting for Enterprise Features Activation")
+            time.sleep(30)
         else:
             print("VAIS vector store exists, retrieving the values...")
-            waize_engine_id = self.__deserialize_engine_id()
+        waize_engine_id = self.__deserialize_engine_id()
 
         return VertexAISearchVectorStore(self.config.get("bq_project_id"), waize_engine_id)
 
@@ -673,6 +677,50 @@ class VertexAISearchVectorStrategy(VectorStrategy):
                 delay_factor = min(delay_factor**2, 300)
                 print(f"Documents Import Job is in progress, rechecking again in {delay_factor} seconds...")
 
+    def __app_exists(self, project_id, app_id):
+        client = discoveryengine.SearchServiceClient()
+        serving_config = (
+            f"projects/{project_id}/locations/global/"
+            f"collections/default_collection/engines/{app_id}/"
+            "servingConfigs/default_config"
+        )
+        try:
+
+            content_search_spec = discoveryengine.SearchRequest.ContentSearchSpec(
+                snippet_spec=discoveryengine.SearchRequest.ContentSearchSpec.SnippetSpec(return_snippet=True),
+                summary_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec(
+                    summary_result_count=5,
+                    include_citations=True,
+                    ignore_adversarial_query=True,
+                    ignore_non_summary_seeking_query=True,
+                    model_prompt_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec.ModelPromptSpec(
+                        preamble="YOUR_CUSTOM_PROMPT"
+                    ),
+                    model_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec.ModelSpec(
+                        version="stable",
+                    ),
+                ),
+            )
+
+            request = discoveryengine.SearchRequest(
+                serving_config=serving_config,
+                query="What is the meaning of life?",
+                page_size=10,
+                content_search_spec=content_search_spec,
+                query_expansion_spec=discoveryengine.SearchRequest.QueryExpansionSpec(
+                    condition=discoveryengine.SearchRequest.QueryExpansionSpec.Condition.AUTO,
+                ),
+                spell_correction_spec=discoveryengine.SearchRequest.SpellCorrectionSpec(
+                    mode=discoveryengine.SearchRequest.SpellCorrectionSpec.Mode.AUTO
+                ),
+            )
+
+            _ = client.search(request)
+            return True
+        except Exception as e: # pylint: disable=broad-exception-caught
+            print(e)
+            return False
+
     def __create_waize_app(self, project_id, dataset_name, data_store_id):
         """Creates a Vertex AI Search engine.
 
@@ -714,10 +762,17 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         response = requests.post(url, headers=headers, json=data, timeout=3600)
 
         if response.status_code == 200:
-            print(f"Discovery Engine application '{app_name}' (ID: {app_id}) created successfully.")
+            print(f"Discovery Engine Job '{app_name}' (ID: {app_id}) is launched successfully.")
         else:
             print(f"Error creating application: {response.status_code}, {response.text}")
-        return app_id
+        delay_factor = 2
+        while True:
+            if self.__app_exists(project_id, app_id):
+                return app_id
+            else:
+                time.sleep(delay_factor)
+                delay_factor = min(delay_factor**2, 300)
+                print(f"Discovery Engine Job is in progress, rechecking again in {delay_factor} seconds...")
 
 
 class VertexAIVectorStrategy(VectorStrategy):
