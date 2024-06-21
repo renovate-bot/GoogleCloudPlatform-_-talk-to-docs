@@ -706,6 +706,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
                 serving_config=serving_config,
                 query="What is the meaning of life?",
                 page_size=10,
+                filter="data_source: ANY(\"b360\") AND set_number: ANY(\"001acis\")",
                 content_search_spec=content_search_spec,
                 query_expansion_spec=discoveryengine.SearchRequest.QueryExpansionSpec(
                     condition=discoveryengine.SearchRequest.QueryExpansionSpec.Condition.AUTO,
