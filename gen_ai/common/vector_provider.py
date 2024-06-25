@@ -301,13 +301,19 @@ class VertexAISearchVectorStore(VectorStore):
         ls = response.results
         docs = []
         for item in ls:
-            content = item.document.derived_struct_data["extractive_segments"][0]["content"]
-            score = item.document.derived_struct_data["extractive_segments"][0]["relevanceScore"]
-            doc = Document(page_content=content)
-            struct_data_dict = map_composite_to_dict(item.document.struct_data)
-            doc.metadata = struct_data_dict
-            docs.append((doc, score))
-        return docs
+            try:
+                content = item.document.derived_struct_data["extractive_segments"][0]["content"]
+                score = item.document.derived_struct_data["extractive_segments"][0]["relevanceScore"]
+                doc = Document(page_content=content)
+                struct_data_dict = map_composite_to_dict(item.document.struct_data)
+                doc.metadata = struct_data_dict
+                docs.append((doc, score))
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                print("Exception happened on parsing:", item.document.struct_data["data_source"])
+                print(e)
+                continue
+
+        return sorted(docs, key=lambda x: x[1]  , reverse=True)
 
     def similarity_search_with_score(
         self, query: str, k: int = 4, filter: str = None, **kwargs
@@ -472,7 +478,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             waize_engine_id = self.__create_waize_app(project_id, dataset_name, waize_data_store)
             self.__serialize_engine_id(waize_engine_id, waize_data_store, waize_gcs_uri)
             print("VAIS vector store created successfully... waiting for Enterprise Features Activation")
-            time.sleep(90) # timeout for enterprise features to activate. Talk to Hossein about it
+            time.sleep(90)  # timeout for enterprise features to activate. Talk to Hossein about it
         else:
             print("VAIS vector store exists, retrieving the values...")
         waize_engine_id = self.__deserialize_engine_id()
@@ -706,7 +712,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
                 serving_config=serving_config,
                 query="What is the meaning of life?",
                 page_size=10,
-                filter="data_source: ANY(\"b360\") AND set_number: ANY(\"001acis\")",
+                filter='data_source: ANY("b360") AND set_number: ANY("001acis")',
                 content_search_spec=content_search_spec,
                 query_expansion_spec=discoveryengine.SearchRequest.QueryExpansionSpec(
                     condition=discoveryengine.SearchRequest.QueryExpansionSpec.Condition.AUTO,
@@ -718,7 +724,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
 
             _ = client.search(request)
             return True
-        except Exception as e: # pylint: disable=broad-exception-caught
+        except Exception as e:  # pylint: disable=broad-exception-caught
             print(e)
             return False
 
