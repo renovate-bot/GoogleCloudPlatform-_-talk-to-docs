@@ -221,10 +221,11 @@ class VertexAISearchVectorStore(VectorStore):
             Currently not implemented.
     """
 
-    def __init__(self, project_id: str, engine_id: str):
+    def __init__(self, project_id: str, engine_id: str, use_prev_and_next_segments: bool):
         self.project_id = project_id
         self.location = "global"
         self.engine_id = engine_id
+        self.use_prev_and_next_segments = use_prev_and_next_segments
 
     def _search_sample(
         self,
@@ -280,7 +281,10 @@ class VertexAISearchVectorStore(VectorStore):
         )
         content_search_spec = discoveryengine.SearchRequest.ContentSearchSpec(
             extractive_content_spec=discoveryengine.SearchRequest.ContentSearchSpec.ExtractiveContentSpec(
-                max_extractive_segment_count=1, return_extractive_segment_score=True, num_previous_segments=2
+                max_extractive_segment_count=1,
+                return_extractive_segment_score=True,
+                num_previous_segments=1 if self.use_prev_and_next_segments else 0,
+                num_next_segments=1 if self.use_prev_and_next_segments else 0,
             ),
         )
         request = discoveryengine.SearchRequest(
@@ -302,7 +306,20 @@ class VertexAISearchVectorStore(VectorStore):
         docs = []
         for item in ls:
             try:
-                content = item.document.derived_struct_data["extractive_segments"][0]["content"]
+                extractive_segment = item.document.derived_struct_data["extractive_segments"][0]
+                previous_content = (
+                    extractive_segment["previous_segments"][0]["content"] + "\n"
+                    if "previous_segments" in extractive_segment
+                    else ""
+                )
+                next_content = (
+                    extractive_segment["next_segments"][0]["content"] + "\n"
+                    if "next_segments" in extractive_segment
+                    else ""
+                )
+                central_content = item.document.derived_struct_data["extractive_segments"][0]["content"]
+                content = f"{previous_content}\n{central_content}\n{next_content}"
+
                 score = item.document.derived_struct_data["extractive_segments"][0]["relevanceScore"]
                 doc = Document(page_content=content)
                 struct_data_dict = map_composite_to_dict(item.document.struct_data)
@@ -313,7 +330,7 @@ class VertexAISearchVectorStore(VectorStore):
                 print(e)
                 continue
 
-        return sorted(docs, key=lambda x: x[1]  , reverse=True)
+        return sorted(docs, key=lambda x: x[1], reverse=True)
 
     def similarity_search_with_score(
         self, query: str, k: int = 4, filter: str = None, **kwargs
@@ -483,7 +500,9 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             print("VAIS vector store exists, retrieving the values...")
         waize_engine_id = self.__deserialize_engine_id()
 
-        return VertexAISearchVectorStore(self.config.get("bq_project_id"), waize_engine_id)
+        return VertexAISearchVectorStore(
+            self.config.get("bq_project_id"), waize_engine_id, self.config.get("use_prev_and_next_segments", 0)
+        )
 
     def __deserialize_engine_id(self):
         """Deserializes the VAIS engine ID from a JSON file.

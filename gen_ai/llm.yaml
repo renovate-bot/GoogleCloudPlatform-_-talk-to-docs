@@ -21,6 +21,7 @@ scoring_model_name: gemini-1.5-flash-preview-0514
 embeddings_name: vertexai
 embeddings_model_name: textembedding-gecko@003
 vector_name: vais
+use_prev_and_next_segments: true
 document_retriever: custom #custom is for custom use case
 api_mode: stateless
 personalization: true
