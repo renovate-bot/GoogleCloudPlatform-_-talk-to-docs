@@ -4,3 +4,10 @@ json_chunking: custom
 pdf_extraction: with_tables
 pdf_chunking: by_title
 html_extraction: custom
+
+project_id: project_id
+dataset_id: dataset
+table_name: parsing_table
+data_store_id: data_store_id
+
+bucket_parse_interval: 600
