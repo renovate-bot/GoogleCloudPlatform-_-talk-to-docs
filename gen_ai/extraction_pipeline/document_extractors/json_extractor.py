@@ -142,6 +142,7 @@ class CustomJsonMetadataCreatorOne(DefaultJsonMetadataCreator):
         doc_identifier = self.data["structData"].get("doc_identifier")
         section_name = self.data["structData"].get("name")
         url = self.data["structData"].get("url")
+        policy_number = self.data["structData"].get("policy_number")
 
         metadata["doc_identifier"] = (
             doc_identifier.lower().strip() if doc_identifier else ""
@@ -150,6 +151,7 @@ class CustomJsonMetadataCreatorOne(DefaultJsonMetadataCreator):
             section_name.lower().strip() if section_name else ""
         )
         metadata["url"] = url if url else ""
+        metadata["policy_number"] = policy_number if policy_number else ""
         metadata["original_filepath"] = os.path.basename(self.filepath)
 
         filename = os.path.basename(self.filepath)
