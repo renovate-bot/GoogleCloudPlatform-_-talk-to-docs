@@ -15,12 +15,13 @@ import time
 from timeit import default_timer
 
 from gen_ai.extraction_pipeline.document_extractors.document_processor import DocumentProcessor
-from google.cloud import storage
+from gen_ai.extraction_pipeline.vais_update import update_the_data_store
+from google.cloud.storage import Client, transfer_manager
 import yaml
 
 CONFIG_FILEPATH = "gen_ai/extraction_pipeline/config.yaml"
 PROCESSABLE_FILETYPES = set([".pdf", ".docx", ".xml", ".json", ".html", ".att_ni_xml"])
-WAIT_TIME = 600 # seconds or 10 mins
+
 
 def process_config_file(config_file: str = "config.yaml") -> dict[str, str]:
     """Reads a YAML configuration file and extracts all parameters.
@@ -89,7 +90,6 @@ def process_directory(
         for filename in os.listdir(input_dir):
             file_extension = os.path.splitext(filename)[-1]
             if file_extension in PROCESSABLE_FILETYPES:
-                
                 filepath = os.path.join(input_dir, filename)
                 extractor = DocumentProcessor(filepath, config_file_parameters)
                 futures[executor.submit(extractor, output_dir)] = filepath
@@ -109,7 +109,7 @@ def process_directory(
                 failure += 1
 
     print(f"Successfully processed {success} out of {success+failure} files.")
-    print(f"Total processing time: {default_timer()-start_time}")
+    print(f"Total Directory Processing Time: {default_timer()-start_time}")
 
     if success:
         return True
@@ -117,8 +117,8 @@ def process_directory(
 
 
 def process_gsbucket(
-    input_dir: str, 
-    output_dir: str, 
+    input_dir: str,
+    output_dir: str,
     config_file_parameters: dict[str, str],
     since_timestamp: datetime | None = None
 ) -> bool:
@@ -139,78 +139,84 @@ def process_gsbucket(
     Returns:
        bool: True if the operation was successful, False otherwise.
     """
-    success = 0
-    failure = 0
+    start_gsbucket = default_timer()
     source_bucket_name, directory = split_bucket_and_directory(input_dir)
-    storage_client = storage.Client()
+    storage_client = Client()
     bucket = storage_client.get_bucket(source_bucket_name)
 
     if since_timestamp is None:
         since_timestamp = datetime.min.replace(tzinfo=timezone.utc)
 
-    with tempfile.TemporaryDirectory() as tmp_directory:
-        blobs = bucket.list_blobs(prefix=directory)
-        for blob in blobs:
-            if blob.time_created > since_timestamp:
-                file_extension = os.path.splitext(blob.name)[-1]
-                if file_extension in PROCESSABLE_FILETYPES:
-                    basename = os.path.basename(blob.name)
-                    destination_file_name = os.path.join(tmp_directory, basename)
-                    blob.download_to_filename(destination_file_name)
-                    extractor = DocumentProcessor(
-                        destination_file_name, config_file_parameters
-                    )
-                    if extractor(output_dir):
-                        print(f"Successfully processed: {blob.name}")
-                        success += 1
-                    else:
-                        print(f"Unsuccessful extraction from {blob.name}")
-                        failure += 1
-                else:
-                    print(
-                        f"Failed extraction on: {blob.name}\nNot implemented File Extension"
-                        f" {file_extension}"
-                    )
+    blob_names = []
 
-    print(f"Successfully processed {success} out of {success+failure} files.")
-    if success:
+    blobs = bucket.list_blobs(prefix=directory)
+    for blob in blobs:
+        if blob.time_created > since_timestamp:
+            basename = os.path.basename(blob.name)
+            blob_names.append(basename)
+    
+    with tempfile.TemporaryDirectory() as tmp_directory:
+        directory = os.path.join(directory, "")
+        results = transfer_manager.download_many_to_path(
+            bucket, blob_names, destination_directory=tmp_directory, blob_name_prefix=directory, max_workers=8
+        )
+        print(f"Copying giles took: {default_timer() - start_gsbucket} sec")
+        for name, result in zip(blob_names, results):
+            if isinstance(result, Exception):
+                print(f"Failed to download {name} due to exception: {result}")
+            else:
+                print(f"Downloaded {name} to.")
+
+        processed = process_directory(tmp_directory, output_dir, config_file_parameters)
+    print(f"Total Bucket Processing Time: {default_timer()-start_gsbucket} sec")
+    if processed:
         return True
     return False
 
 
-def process_gsbucket_inloop(
-    input_dir: str, 
-    config_file_parameters: dict[str, str],
-    output_bucket: str
+def process_continuously(
+    input_dir: str,
+    config_file_parameters: dict[str, str | int],
+    output: str
 ):
     """
     Continuously processes new files from a Google Cloud Storage (GCS) bucket with specified intervals.
 
     This function repeatedly performs the following steps in a loop:
 
-    1. Checks if enough time (WAIT_TIME) has passed since the last processing.
-    2. If so, it calls the `process_gsbucket` function to extract data from the input GCS bucket, placing the output in a temporary directory.
-    3. Copies the extracted data from the temporary directory to the output GCS bucket using the `copy_files_to_bucket` function.
+    1. Checks if enough time has passed since the last processing.
+    2. If so, it calls the `process_gsbucket` function to extract data from the input GCS bucket, placing the output in 
+    a temporary directory.
+    3. Copies the extracted data from the temporary directory to the output GCS bucket using the `copy_files_to_bucket` 
+    function OR updates a Datastore with the extracted data using the `update_the_data_store` function.
     4. Removes the temporary directory.
 
     Args:
         input_dir (str): The GCS bucket path containing the input files.
         config_file_parameters (dict[str, str]): A dictionary containing parameters for the `process_gsbucket` function.
-        output_bucket (str): The GCS bucket path to store the extracted output.
+        output (str): The GCS bucket path or data store id to store the extracted output.
     """
     last_time = datetime.min.replace(tzinfo=timezone.utc)
-
+    parse_interval = config_file_parameters.get("bucket_parse_interval")
     while True:
         current_time = datetime.now(timezone.utc)
-        if current_time - last_time > timedelta(seconds=WAIT_TIME):
+        if current_time - last_time > timedelta(seconds=parse_interval):
             print("Performing an extraction round")
             temp_output_dir = f"temporary_directory_{current_time}"
             os.makedirs(temp_output_dir)
             processed = process_gsbucket(input_dir, temp_output_dir, config_file_parameters, since_timestamp=last_time)
-            if processed:
-                copied = copy_files_to_bucket(temp_output_dir, output_bucket)
+
+            if output.startswith("gs://") and processed:
+                copied = copy_files_to_bucket(temp_output_dir, output)
                 if copied:
-                    print(f"Successfully copied extractions to gs bucket {output_bucket}")
+                    print(f"Successfully copied extractions to gs bucket {output}")
+
+            elif output.startswith("datastore") and processed:
+                data_store_id = output.split(":")[-1]
+                updated = update_the_data_store(temp_output_dir, config_file_parameters, data_store_id)
+                if updated:
+                    print(f"Successfully updated the data_store {output}")
+
             shutil.rmtree(temp_output_dir)
             print(f"Processed gs bucket at: {current_time}")
 
@@ -237,7 +243,7 @@ def copy_files_to_bucket(output_dir: str, gs_bucket: str) -> bool:
         return False
     now = datetime.now()
     output_directory = f"extractions{now.year}{now.month:02d}{now.day:02d}"
-    
+
     if not gs_bucket.endswith("/"):
         gs_bucket += "/"
     command = ["gsutil", "-m", "cp", "-r", f"{output_dir}/*", f"{gs_bucket}{output_directory}/"]
@@ -245,7 +251,7 @@ def copy_files_to_bucket(output_dir: str, gs_bucket: str) -> bool:
     try:
         subprocess.run(command, check=True)
     except subprocess.CalledProcessError as e:
-        print("Error copying files to bucket")
+        print(f"Error copying files to bucket: {e}")
         return False
     return True
 
@@ -260,37 +266,47 @@ def main():
     )
 
     parser.add_argument(
-        "-i", "--input_dir", help="Input directory", required=True
+        "-i", "--input", help="Input directory or gs bucket", required=True
     )
     parser.add_argument(
-        "-o", "--output_dir", help="Output directory", default="output_data"
-    )
-    parser.add_argument(
-        "-gs", "--gs_bucket", help="Output gs bucket where to upload data after extraction"
+        "-o", "--output", help="Output directory, gs bucket or datastore (output_data, gs://t2x_bucket or datastore:t2x_datastore)", default="output_data"
     )
     args = parser.parse_args()
 
     config_file_parameters = process_config_file(CONFIG_FILEPATH)
 
     if args.mode == "batch":
-        if not os.path.exists(args.output_dir):
-            os.makedirs(args.output_dir)
-            print(f"Directory '{args.output_dir}' created.")
-
-        if args.input_dir.startswith("gs://"):
-            processed = process_gsbucket(args.input_dir, args.output_dir, config_file_parameters)
+        if args.output.startswith("gs://") or args.output.startswith("datastore"):
+            output_dir = f"temporary_directory_{datetime.now(timezone.utc)}"
         else:
-            processed = process_directory(args.input_dir, args.output_dir, config_file_parameters)
+            output_dir = args.output
 
-        if args.gs_bucket and processed:
-            copied = copy_files_to_bucket(args.output_dir, args.gs_bucket)
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            print(f"Directory '{output_dir}' created.")
+
+        if args.input.startswith("gs://"):
+            processed = process_gsbucket(args.input, output_dir, config_file_parameters)
+        else:
+            processed = process_directory(args.input, output_dir, config_file_parameters)
+
+        if args.output.startswith("gs://") and processed:
+            copied = copy_files_to_bucket(output_dir, args.output)
             if copied:
-                print(f"Successfully copied extractions to gs bucket {args.gs_bucket}")
+                print(f"Successfully copied extractions to gs bucket {args.output}")
+            shutil.rmtree(output_dir)
+
+        elif args.output.startswith("datastore"):
+            data_store_id = args.output.split(":")[-1]
+            update_status = update_the_data_store(output_dir, config_file_parameters, data_store_id)
+            if update_status:
+                print(f"Successfully uploaded extractions to data store {args.output}")
+            shutil.rmtree(output_dir)
 
     elif args.mode == "continuous":
-        if args.gs_bucket is None:
-            parser.error("Argument -gs/--gs_bucket is required for continuous mode.")
-        process_gsbucket_inloop(args.input_dir, config_file_parameters, args.gs_bucket)
+        if not args.input.startswith("gs://"):
+            parser.error("Argument input should be gs_bucket for continuous mode.")
+        process_continuously(args.input, config_file_parameters, args.output)
 
 if __name__ == "__main__":
     main()
