@@ -10,7 +10,7 @@ setup(
     name="gen_ai",
     version="0.1.0",
     packages=find_packages(include=['gen_ai']),
-    install_requires=get_requirements("requirements.txt"),
+    install_requires=get_requirements("gen_ai/extraction_pipeline/requirements.txt"),
     author="Google LLC",
     author_email="chertushkin@google.com",
     description="This is pipeline code for accelerating solution accelerators",
