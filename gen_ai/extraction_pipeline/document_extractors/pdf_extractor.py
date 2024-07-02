@@ -145,7 +145,7 @@ class PdfExtractor(BaseExtractor):
         if self.pdf_chunking == "by_title":
             document_chunker = DefaultPdfChunker(self.elements, by_title=True)
         elif self.pdf_chunking == "semantic":
-            if self.pdf_extraction != "docai":
+            if self.pdf_extraction != "default" or self.pdf_extraction != "with_tables":
                 print("Semantic chunking is only for unstructured extraction (default or with_tables)")
                 return False
             whole_document_text = " \n".join([el.text for el in self.elements if el.category not in ("Footer", "Header")])
