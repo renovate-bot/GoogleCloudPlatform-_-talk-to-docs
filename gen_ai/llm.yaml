@@ -17,8 +17,8 @@ logs_directory: gen_ai/logs
 gradio_root_path: /t2x-mig-ui
 vais_engine_id: engine_id # should be set if vector_name is vais
 # Technical configuration
-model_name: gemini-1.5-flash-preview-0514
-scoring_model_name: gemini-1.5-flash-preview-0514
+model_name: gemini-1.5-flash-001
+scoring_model_name: gemini-1.5-flash-001
 embeddings_name: vertexai
 embeddings_model_name: textembedding-gecko@003
 vector_name: vais
@@ -39,6 +39,7 @@ max_number_of_docs_retrieved_mmr: 3
 previous_conversations_number: 2
 previous_conversation_score_threshold: 2
 parallel_main_llm_calls: 5
+parallel_main_llm_timeout: 5
 
 is_debug: false
 print_system_metrics: true

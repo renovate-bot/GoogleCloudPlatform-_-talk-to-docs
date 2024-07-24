@@ -42,7 +42,7 @@ from gen_ai.common.memorystore_utils import serialize_previous_conversation
 from gen_ai.common.react_utils import filter_non_relevant_previous_conversations, get_confidence_score
 from gen_ai.common.retriever import perform_retrieve_round, retrieve_initial_documents
 from gen_ai.common.statefullness import resolve_and_enrich, serialize_response
-from gen_ai.common.exponential_retry import concurrent_best_reduce
+from gen_ai.common.exponential_retry import concurrent_best_reduce, timeout_llm_call
 from gen_ai.common.document_utils import generate_contexts_from_docs
 from gen_ai.custom_client_functions import fill_query_state_with_doc_attributes
 from gen_ai.deploy.model import Conversation, PersonalizedData, QueryState, transform_to_dictionary
@@ -91,6 +91,7 @@ def get_total_count(question: str, selected_context: str, previous_rounds: str, 
 
 
 @concurrent_best_reduce(num_calls=Container.config.get("parallel_main_llm_calls", 1))
+@timeout_llm_call(timeout=Container.config.get("parallel_main_llm_timeout", 20))
 def perform_main_llm_call(
     react_chain: Any,
     question: str,
