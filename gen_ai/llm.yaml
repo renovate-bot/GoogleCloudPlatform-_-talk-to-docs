@@ -28,7 +28,7 @@ personalization: true
 temperature: 0.5
 max_output_tokens: 4000
 max_context_size: 1025000
-max_rounds: 2
+max_rounds: 1
 similar_questions_number: 0
 use_full_documents: true
 use_relevancy_score: false
@@ -40,6 +40,7 @@ previous_conversations_number: 2
 previous_conversation_score_threshold: 2
 parallel_main_llm_calls: 5
 parallel_main_llm_timeout: 5
+separate_confidence_score: true
 
 is_debug: false
 print_system_metrics: true

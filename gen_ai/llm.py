@@ -151,6 +151,12 @@ def perform_main_llm_call(
         except Exception as e:  # pylint: disable=W0718
             Container.logger().info(msg=f"Crashed before correct chain, attempts: {attempts}")
             Container.logger().info(msg=str(e))
+            if not Container.config.get("separate_confidence_score", True):
+                output["answer"] = "I was not able to answer this question"
+                output["plan_and_summaries"] = ""
+                output["context_used"] = "[]"
+                output["additional_information_to_retrieve"] = ""
+                return output, 0
             json_output = json_corrector_chain().run(json=output_raw)
             json_output = json_output.replace("`json", "").replace("`", "")
             try:
@@ -168,8 +174,18 @@ def perform_main_llm_call(
         output["answer"] = "I was not able to answer this question"
         output["plan_and_summaries"] = ""
         output["context_used"] = ""
-
-    confidence = get_confidence_score(question, output["answer"])
+        return output, 0
+    
+    if Container.config.get("separate_confidence_score", True):
+        confidence = get_confidence_score(question, output["answer"])
+    else:
+        try:
+            confidence = output.get("confidence_score", 0)
+            confidence = int(confidence)
+        except ValueError:
+            print("failed to convert {confidence} to integer")
+            print(f"{confidence}")
+            confidence = 0
 
     return output, confidence  # return output and confidence
 
