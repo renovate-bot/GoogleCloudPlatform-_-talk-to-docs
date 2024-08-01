@@ -138,6 +138,7 @@ def perform_main_llm_call(
 
     attempts = 2
     done = False
+    output = {}
     while not done:
         try:
             if attempts <= 0:
