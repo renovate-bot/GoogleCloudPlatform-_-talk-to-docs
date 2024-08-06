@@ -614,7 +614,6 @@ class CustomJsonChunkerThree(CustomJsonChunkerTwo):
         benefit_id = self.data["BenefitPlan"].get("BenefitPlanID")
         text = ""
         section_name = "Policy Data"
-        full_text = ""
 
         for item in self.data['BenefitPlan']['BenefitPlanCSRSection']['BenefitPlanCSR']:
             text += item["BenefitPlanCSRName"] + "\n"
@@ -623,7 +622,6 @@ class CustomJsonChunkerThree(CustomJsonChunkerTwo):
                 text += DefaultHtmlIngestor.extract_from_html_using_markdownify(description) + "\n"
             text += "\n\n"
         output_data[(benefit_id, section_name)] = text
-        full_text += text+"\n"
        
         for item in self.data["BenefitPlan"]['BenefitPlanCostShareSections']['PlanCostShareSection']:
             section_name = item.get("PlanCostShareSectionName")
@@ -636,7 +634,6 @@ class CustomJsonChunkerThree(CustomJsonChunkerTwo):
             
             if (benefit_id, section_name) not in output_data:
                 output_data[(benefit_id, section_name)] = text
-                full_text += text+"\n"
             else:
                 print(section_name)
 
@@ -650,17 +647,12 @@ class CustomJsonChunkerThree(CustomJsonChunkerTwo):
             
             if (benefit_id, section_name) not in output_data:
                 output_data[(benefit_id, section_name)] = text
-                full_text += text+"\n"
             else:
                 print(section_name)
         deductibles_text = output_data.get((benefit_id, "Deductibles"))
         for benefit_id, section_name in output_data:
             if section_name != "Deductibles":
                 output_data[(benefit_id, section_name)] += deductibles_text 
-
-
-
-        output_data[(benefit_id, "Full Text")] = full_text
         return output_data
 
 
