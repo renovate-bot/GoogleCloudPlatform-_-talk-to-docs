@@ -10,11 +10,34 @@ from google.cloud import bigquery
 
 
 def update_the_data_store(input_dir: str, config: dict[str, str], data_store_id: str | None = None):
+    """
+    Updates a Datastore entity with data from files located in a directory.
+
+    This function consolidates the data files from the specified input directory, creates a BigQuery table 
+    if necessary, loads the consolidated data into the BigQuery table, and finally imports the data 
+    into a Datastore entity.
+
+    Args:
+        input_dir: The directory containing data files to be processed.
+        config: A dictionary containing configuration settings:
+            - "project_id": (Optional) The Google Cloud Project ID. If not provided, defaults to the current project.
+            - "dataset_id": The BigQuery dataset ID.
+            - "table_name": The BigQuery table name.
+            - "data_store_id": The ID of the Datastore entity to be updated.
+        data_store_id: (Optional) The ID of the Datastore entity. If not provided or set to 'datastore', 
+            defaults to the value from the 'config' dictionary.
+
+    Returns:
+        True if the Datastore entity was successfully updated, False otherwise.
+    """
     project_id = config.get("project_id")
     dataset_id = config.get("dataset_id")
     table_name = config.get("table_name")
     if not data_store_id or data_store_id == "datastore":
         data_store_id = config.get("data_store_id")
+
+    if not project_id:
+        _, project_id = google.auth.default()
 
     # BigQuery Client
     client = bigquery.Client(project=project_id)
@@ -24,39 +47,70 @@ def update_the_data_store(input_dir: str, config: dict[str, str], data_store_id:
     print(f"Created dataset and table: {dataset_id}.{table_name}")
     # create merged json file
     df = merge_json_files(input_dir)
-    print(f"Created dataframe from {len(df))} files")
+    print(f"Created dataframe from {len(df)} files")
 
     # put the json file into bq
     table_id = f'{project_id}.{dataset_id}.{table_name}'
     inserted = insert_all_rows(df, client, table_id)
     if not inserted:
         return False
-    print(f"Pushed")
+    print("Pushed into the BQ table")
 
-    # fetch from bq to data store
-    updated_data_store = import_bigquery_to_datastore_batched(
+    # fetch to data store
+    updated_data_store = import_to_datastore_batched(
         project_id,
-        table_id,
         data_store_id,
         df,
         batch_size=100
     )
-    print("Done updated_data_store")
+    print("Done updating the datastore")
     if not updated_data_store:
         return False
+    
     return True
 
-def replace_consecutive_whitespace(text):
-    """Replaces consecutive whitespace characters with a single space."""
-    # return re.sub(r'(\s)\1+', r'\1', text)
+
+def replace_consecutive_whitespace(text: str) -> str:
+    """
+    Replaces consecutive whitespace characters (including spaces, tabs, and newlines) within the given text with a single space.
+
+    Args:
+        text: The input text string.
+
+    Returns:
+        The modified text string with consecutive whitespace replaced.
+    """
     return re.sub(r'\s+', ' ', text)
 
-def remove_stars_and_consecutive_whitespaces(text):
-    """Removes all star signs and replaces consecutive whitespaces with a single space."""
+
+def remove_stars_and_consecutive_whitespaces(text: str) -> str:
+    """
+    Removes all star signs (*) from the given text and then replaces any consecutive whitespace characters with a single space.
+
+    Args:
+        text: The input text string.
+
+    Returns:
+        The modified text string with stars removed and consecutive whitespace replaced.
+    """
     text_without_stars = re.sub(r'\*', ' ', text)  # Remove stars
     return replace_consecutive_whitespace(text_without_stars)  # Replace
 
+
 def merge_json_files(input_dir: str) -> pd.DataFrame:
+    """
+    Merges metadata JSON files with their corresponding text content in a specified directory.
+
+    This function iterates through the files in the given directory. For each "_metadata.json" file, it extracts relevant information
+    like the original filepath, section name, and content from a corresponding text file (if it exists). It processes this data, creates unique IDs,
+    and organizes everything into a Pandas DataFrame.
+
+    Args:
+        input_dir: The directory containing the JSON and text files to be processed.
+
+    Returns:
+        A DataFrame with two columns: 'id' (unique identifier for each entry) and 'JsonData' (containing the combined JSON data and text content).
+    """
     final_json = {}
 
     for filename in os.listdir(input_dir):
@@ -88,7 +142,18 @@ def merge_json_files(input_dir: str) -> pd.DataFrame:
 
 
 def create_dataset_and_table(client, project_id: str, dataset_id: str, table_name: str):
+    """
+    Creates a BigQuery dataset and table if they don't already exist.
 
+    Args:
+        client: A BigQuery client object.
+        project_id: The ID of the Google Cloud project.
+        dataset_id: The ID of the dataset to create or use.
+        table_name: The name of the table to create within the dataset.
+
+    Returns:
+        None (Currently, the function doesn't explicitly return a value, but ideally, it should indicate success or failure)
+    """
     # Create the dataset if it doesn't exist
     dataset = bigquery.Dataset(f"{project_id}.{dataset_id}")
     client.create_dataset(dataset, exists_ok=True)
@@ -118,10 +183,20 @@ def create_dataset_and_table(client, project_id: str, dataset_id: str, table_nam
         print(f"Created table {table_id}")
     else:
         print(f"Table {table_id} already exists. Please append rows if needed.")
-    #TODO: return smth bool or Table
 
 
 def insert_all_rows(df: pd.DataFrame, client, table_id: str):
+    """
+    Inserts all rows from a Pandas DataFrame into a specified BigQuery table.
+
+    Args:
+        df: The DataFrame containing the data to insert.
+        client: The BigQuery client object.
+        table_id: The ID of the BigQuery table to insert data into.
+
+    Returns:
+        True if all rows were successfully inserted, False otherwise.
+    """
     rows_to_insert = [
         {"id": df['id'][i], "JsonData": str(df['JsonData'][i])}
         for i in range(len(df))
@@ -138,11 +213,19 @@ def insert_all_rows(df: pd.DataFrame, client, table_id: str):
         return False
 
 
-def import_bigquery_to_datastore_batched(project_id: str, table_id: str, data_store_id: str, df: pd.DataFrame, batch_size=100):
-    """Imports data from BigQuery to Generative AI App Builder Datastore in batches."""
-    print(project_id)
-    print(table_id)
-    print(data_store_id)
+def import_to_datastore_batched(project_id: str, data_store_id: str, df: pd.DataFrame, batch_size=100):
+    """
+    Imports data from a Pandas DataFrame to a Google Cloud Discovery Engine Datastore in batches.
+
+    Args:
+        project_id (str): The ID of the Google Cloud project.
+        data_store_id (str): The ID of the Discovery Engine Datastore.
+        df (pd.DataFrame): The DataFrame containing the data to be imported. It is assumed to have columns 'id' and 'JsonData'.
+        batch_size (int, optional): The number of documents to import in each batch. Defaults to 100.
+
+    Returns:
+        bool: True if the import was successful for all batches, False otherwise.
+    """
     # Authenticate with Google Cloud
     credentials, _ = google.auth.default()
     credentials.refresh(Request())
