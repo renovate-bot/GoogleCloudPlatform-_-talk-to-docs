@@ -151,7 +151,7 @@ class CustomJsonMetadataCreatorOne(DefaultJsonMetadataCreator):
             section_name.lower().strip() if section_name else ""
         )
         metadata["url"] = url if url else ""
-        metadata["policy_number"] = policy_number if policy_number else ""
+        metadata["policy_number"] = policy_number if policy_number else "generic"
         metadata["original_filepath"] = os.path.basename(self.filepath)
 
         filename = os.path.basename(self.filepath)
