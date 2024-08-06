@@ -5,7 +5,7 @@ pdf_extraction: with_tables
 pdf_chunking: by_title
 html_extraction: custom
 
-project_id: project_id
+project_id: null
 dataset_id: dataset
 table_name: parsing_table
 data_store_id: data_store_id
