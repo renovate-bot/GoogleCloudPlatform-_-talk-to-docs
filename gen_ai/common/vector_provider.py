@@ -223,14 +223,14 @@ class VertexAISearchVectorStore(VectorStore):
             Currently not implemented.
     """
 
-    def __init__(
-        self, project_id: str, engine_id: str, data_store_id: str, use_prev_and_next_pieces: int, location: str
-    ):
+    def __init__(self, project_id: str, engine_id: str, data_store_id: str, config: dict):
         self.project_id = project_id
         self.engine_id = engine_id
         self.data_store_id = data_store_id
-        self.use_prev_and_next_pieces = use_prev_and_next_pieces
-        self.location = location
+        self.config = config
+        self.use_prev_and_next_pieces = self.config.get("use_prev_and_next_pieces", 0)
+        self.location = self.config.get("vais_location", "global")
+        self.vais_datastore_mode = self.config.get("vais_datastore_mode", "extractive")
 
     @retry_with_exponential_backoff()
     def perform_search_request(self, client, request):
@@ -295,14 +295,26 @@ class VertexAISearchVectorStore(VectorStore):
             f"collections/default_collection/engines/{engine_id}/"
             "servingConfigs/default_config"
         )
-        content_search_spec = discoveryengine.SearchRequest.ContentSearchSpec(
-            extractive_content_spec=discoveryengine.SearchRequest.ContentSearchSpec.ExtractiveContentSpec(
-                max_extractive_segment_count=1,
-                return_extractive_segment_score=True,
-                num_previous_segments=self.use_prev_and_next_pieces,
-                num_next_segments=self.use_prev_and_next_pieces,
-            ),
-        )
+        if self.vais_datastore_mode == "extractive":
+            content_search_spec = discoveryengine.SearchRequest.ContentSearchSpec(
+                extractive_content_spec=discoveryengine.SearchRequest.ContentSearchSpec.ExtractiveContentSpec(
+                    max_extractive_segment_count=1,
+                    return_extractive_segment_score=True,
+                    num_previous_segments=self.use_prev_and_next_pieces,
+                    num_next_segments=self.use_prev_and_next_pieces,
+                ),
+            )
+        elif self.vais_datastore_mode == "chunk":
+            content_search_spec = discoveryengine.SearchRequest.ContentSearchSpec(
+                chunk_spec=discoveryengine.SearchRequest.ContentSearchSpec.ChunkSpec(
+                    num_previous_chunks=self.use_prev_and_next_pieces,
+                    num_next_chunks=self.use_prev_and_next_pieces,
+                ),
+                search_result_mode="CHUNKS",
+            )
+        else:
+            raise ValueError("Not correct mode for vais is passed, should be chunk/extractive")
+
         request = discoveryengine.SearchRequest(
             serving_config=serving_config,
             query=search_query,
@@ -529,8 +541,8 @@ class VertexAISearchVectorStrategy(VectorStrategy):
 
             waize_gcs_uri = self.__prepare_waize_format(processed_files_dir, dataset_name)
             waize_data_store = self.__create_waize_data_store(project_id, dataset_name, self.location)
-            waize_data_store = self.__import_data_to_waize_data_store(project_id, waize_data_store, waize_gcs_uri)
-            waize_engine_id = self.__create_waize_app(project_id, dataset_name, waize_data_store)
+            waize_data_store = self.__import_data_to_waize_data_store(project_id, waize_data_store, waize_gcs_uri, self.location)
+            waize_engine_id = self.__create_waize_app(project_id, dataset_name, waize_data_store, self.location)
             self.__serialize_engine_id(waize_engine_id, waize_data_store, waize_gcs_uri)
             print("VAIS vector store created successfully... waiting for Enterprise Features Activation")
             time.sleep(90)  # timeout for enterprise features to activate. Talk to Hossein about it
@@ -538,9 +550,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             print("VAIS vector store exists, retrieving the values...")
         waize_engine_id, waize_data_store = self.__deserialize_engine_id()
 
-        return VertexAISearchVectorStore(
-            project_id, waize_engine_id, waize_data_store, self.config.get("use_prev_and_next_pieces", 0), self.location
-        )
+        return VertexAISearchVectorStore(project_id, waize_engine_id, waize_data_store, self.config)
 
     def __deserialize_engine_id(self):
         """Deserializes the VAIS engine ID from a JSON file.
@@ -655,7 +665,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         }
 
         url = (
-            f"https://discoveryengine.googleapis.com/v1alpha/projects/{project_id}/"
+            f"{self.base_url}/projects/{project_id}/"
             f"locations/{location}/collections/default_collection/dataStores"
             f"?dataStoreId={new_data_store}"
         )
@@ -689,7 +699,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
 
         return new_data_store
 
-    def __import_finished(self, project_id: str, data_store_id: str):
+    def __import_finished(self, project_id: str, data_store_id: str, location):
         """Checks if the import to the Vertex AI Search data store is finished.
 
         Args:
@@ -704,7 +714,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         parent = client.branch_path(
             project=project_id,
             data_store=data_store_id,
-            location="global",
+            location=location,
             branch="default_branch",
         )
         print("Checking status of import to VAIS")
@@ -716,7 +726,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             print(f"Error: {e}")
             return False
 
-    def __import_data_to_waize_data_store(self, project_id, data_store_id, waize_gcs_uri):
+    def __import_data_to_waize_data_store(self, project_id, data_store_id, waize_gcs_uri, location):
         """Imports data to the Vertex AI Search data store from GCS.
 
         Args:
@@ -729,7 +739,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         """
         print(f"Importing the Documents to Data Store: {data_store_id}...")
         url = (
-            f"{self.base_url}/projects/{project_id}/locations/global/collections/default_collection/"
+            f"{self.base_url}/projects/{project_id}/locations/{location}/collections/default_collection/"
             f"dataStores/{data_store_id}/branches/0/documents:import"
         )
 
@@ -751,17 +761,17 @@ class VertexAISearchVectorStrategy(VectorStrategy):
 
         delay_factor = 2
         while True:
-            if self.__import_finished(project_id, data_store_id):
+            if self.__import_finished(project_id, data_store_id, location):
                 return data_store_id
             else:
                 time.sleep(delay_factor)
                 delay_factor = min(delay_factor**2, 300)
                 print(f"Documents Import Job is in progress, rechecking again in {delay_factor} seconds...")
 
-    def __app_exists(self, project_id, app_id):
+    def __app_exists(self, project_id, app_id, location):
         client = discoveryengine.SearchServiceClient()
         serving_config = (
-            f"projects/{project_id}/locations/global/"
+            f"projects/{project_id}/locations/{location}/"
             f"collections/default_collection/engines/{app_id}/"
             "servingConfigs/default_config"
         )
@@ -775,7 +785,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
                     ignore_adversarial_query=True,
                     ignore_non_summary_seeking_query=True,
                     model_prompt_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec.ModelPromptSpec(
-                        preamble="YOUR_CUSTOM_PROMPT"
+                        preamble="Here is an important question"
                     ),
                     model_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec.ModelSpec(
                         version="stable",
@@ -803,7 +813,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             print(e)
             return False
 
-    def __create_waize_app(self, project_id, dataset_name, data_store_id):
+    def __create_waize_app(self, project_id, dataset_name, data_store_id, location):
         """Creates a Vertex AI Search engine.
 
         Args:
@@ -822,7 +832,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         auth_token = subprocess.check_output("gcloud auth print-access-token", shell=True, text=True).strip()
 
         url = (
-            f"{self.base_url}/projects/{project_id}/locations/global/collections/"
+            f"{self.base_url}/projects/{project_id}/locations/{location}/collections/"
             f"default_collection/engines?engineId={app_id}"
         )
         headers = {
@@ -849,7 +859,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             print(f"Error creating application: {response.status_code}, {response.text}")
         delay_factor = 2
         while True:
-            if self.__app_exists(project_id, app_id):
+            if self.__app_exists(project_id, app_id, location):
                 return app_id
             else:
                 time.sleep(delay_factor)

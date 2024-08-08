@@ -22,7 +22,7 @@ embeddings_name: vertexai
 embeddings_model_name: textembedding-gecko@003
 vector_name: vais
 vais_datastore_mode: extractive # chunk/extractive
-vais_location: global # us/global
+vais_location: us # us/global
 use_prev_and_next_pieces: 3 # integer between 0 and 3
 document_retriever: custom #custom is for custom use case
 api_mode: stateless
