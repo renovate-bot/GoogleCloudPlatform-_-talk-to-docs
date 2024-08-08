@@ -299,8 +299,8 @@ class VertexAISearchVectorStore(VectorStore):
             extractive_content_spec=discoveryengine.SearchRequest.ContentSearchSpec.ExtractiveContentSpec(
                 max_extractive_segment_count=1,
                 return_extractive_segment_score=True,
-                num_previous_segments=self.use_prev_and_next_segments,
-                num_next_segments=self.use_prev_and_next_segments,
+                num_previous_segments=self.use_prev_and_next_pieces,
+                num_next_segments=self.use_prev_and_next_pieces,
             ),
         )
         request = discoveryengine.SearchRequest(
@@ -539,7 +539,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         waize_engine_id, waize_data_store = self.__deserialize_engine_id()
 
         return VertexAISearchVectorStore(
-            project_id, waize_engine_id, waize_data_store, self.config.get("use_prev_and_next_pieces", 0)
+            project_id, waize_engine_id, waize_data_store, self.config.get("use_prev_and_next_pieces", 0), self.location
         )
 
     def __deserialize_engine_id(self):
