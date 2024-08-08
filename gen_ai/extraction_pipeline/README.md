@@ -41,6 +41,18 @@ python gen_ai/extraction_pipeline/processor.py batch -i gs://dataset_raw_data/ex
 ```sh
 python gen_ai/extraction_pipeline/processor.py continuous -i gs://dataset_raw_data/20240417_docx -o datastore:datastore_id
 ```
+## Installation
+1. Update the package list and Install the dependencies
+```sh
+sudo apt-get update && sudo apt-get install libgl1 poppler-utils tesseract-ocr
+```
+2. Install the python requirements  
+Update the line 13 in `setup.py` file to: `install_requires=get_requirements("gen_ai/extraction_pipeline/requirements.txt"),`  
+Then run pip install:
+```sh
+pip install -e .
+```
+
 
 ## Important Notes
 - Ensure that the `config.yaml` file is correctly configured with the required parameters.
