@@ -331,16 +331,66 @@ class VertexAISearchVectorStore(VectorStore):
 
         response = self.perform_search_request(client, request)
         ls = response.results
+        if self.vais_datastore_mode == "extractive":
+            docs = self.get_extractive_segments(ls)
+        elif self.vais_datastore_mode == "chunk":
+            docs = self.get_chunks(ls)
+        else:
+            raise ValueError("Not correct mode for vais is passed, should be chunk/extractive")
+
+    def get_chunks(self, ls: list) -> list[Document]:
+        docs = []
+        for item in ls:
+            try:
+                previous_content = (
+                    self._build_next_and_previous_content(
+                        item.chunk.chunk_metadata.previous_chunks, lambda x: x.content, True
+                    )
+                    if len(item.chunk.chunk_metadata.previous_chunks) >= 1
+                    else ""
+                )
+                next_content = (
+                    self._build_next_and_previous_content(item.chunk.chunk_metadata.next_chunks, lambda x: x.content)
+                    if len(item.chunk.chunk_metadata.next_chunks) >= 1
+                    else ""
+                )
+                central_content = item.chunk.content
+
+                content = f"{previous_content}\n{central_content}\n{next_content}"
+                metadata = map_composite_to_dict(item.chunk.document_metadata.struct_data)
+                score = 0.9  # we use 0.9 as default value, because we don't sort on relevancy score,
+                doc = Document(page_content=content)
+                doc.metadata = metadata
+                docs.append((doc, score))
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                print("Exception happened on parsing:", item)
+                print(e)
+                continue
+
+    def _build_next_and_previous_content(self, chunks: list, content_functor: callable, reverse: bool = False) -> str:
+        content = []
+        for i in range(len(chunks)):
+            content.append(content_functor(chunks[i]))
+            content.append("\n")
+
+        if reverse:
+            content = content[::-1]
+        return "".join(content)
+
+    def get_extractive_segments(self, ls: list) -> list[Document]:
+        docs = []
         for item in ls:
             try:
                 extractive_segment = item.document.derived_struct_data["extractive_segments"][0]
                 previous_content = (
-                    self._build_extractive_content(extractive_segment["previous_segments"], True)
+                    self._build_next_and_previous_content(
+                        extractive_segment["previous_segments"], lambda x: x["content"], True
+                    )
                     if "previous_segments" in extractive_segment
                     else ""
                 )
                 next_content = (
-                    self._build_extractive_content(extractive_segment["next_segments"])
+                    self._build_next_and_previous_content(extractive_segment["next_segments"], lambda x: x["content"])
                     if "next_segments" in extractive_segment
                     else ""
                 )
@@ -356,18 +406,8 @@ class VertexAISearchVectorStore(VectorStore):
                 print("Exception happened on parsing:", item.document.struct_data["data_source"])
                 print(e)
                 continue
-        # return docs
+
         return sorted(docs, key=lambda x: x[1], reverse=True)
-
-    def _build_extractive_content(self, segments: list, reverse: bool = False) -> str:
-        content = []
-        for i in range(len(segments)):
-            content.append(segments[i]["content"])
-            content.append("\n")
-
-        if reverse:
-            content = content[::-1]
-        return "".join(content)
 
     def similarity_search_with_score(
         self, query: str, k: int = 4, filter: str = None, **kwargs
@@ -541,7 +581,9 @@ class VertexAISearchVectorStrategy(VectorStrategy):
 
             waize_gcs_uri = self.__prepare_waize_format(processed_files_dir, dataset_name)
             waize_data_store = self.__create_waize_data_store(project_id, dataset_name, self.location)
-            waize_data_store = self.__import_data_to_waize_data_store(project_id, waize_data_store, waize_gcs_uri, self.location)
+            waize_data_store = self.__import_data_to_waize_data_store(
+                project_id, waize_data_store, waize_gcs_uri, self.location
+            )
             waize_engine_id = self.__create_waize_app(project_id, dataset_name, waize_data_store, self.location)
             self.__serialize_engine_id(waize_engine_id, waize_data_store, waize_gcs_uri)
             print("VAIS vector store created successfully... waiting for Enterprise Features Activation")
@@ -641,7 +683,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
 
         return new_bucket_name
 
-    def __create_waize_data_store(self, project_id, dataset_name, location):
+    def __create_waize_data_store(self, project_id, dataset_name, location) -> str:
         """Creates a data store in Vertex AI Search.
 
         Args:
@@ -709,7 +751,10 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         Returns:
             bool: True if import is finished, False otherwise.
         """
-        client_options = None
+        client_options = (
+            ClientOptions(api_endpoint=f"{location}-discoveryengine.googleapis.com") if location != "global" else None
+        )
+
         client = discoveryengine.DocumentServiceClient(client_options=client_options)
         parent = client.branch_path(
             project=project_id,
@@ -768,8 +813,11 @@ class VertexAISearchVectorStrategy(VectorStrategy):
                 delay_factor = min(delay_factor**2, 300)
                 print(f"Documents Import Job is in progress, rechecking again in {delay_factor} seconds...")
 
-    def __app_exists(self, project_id, app_id, location):
-        client = discoveryengine.SearchServiceClient()
+    def __app_exists(self, project_id, app_id, location) -> bool:
+        client_options = (
+            ClientOptions(api_endpoint=f"{location}-discoveryengine.googleapis.com") if location != "global" else None
+        )
+        client = discoveryengine.SearchServiceClient(client_options=client_options)
         serving_config = (
             f"projects/{project_id}/locations/{location}/"
             f"collections/default_collection/engines/{app_id}/"
