@@ -21,7 +21,6 @@ import subprocess
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List
 
 import google.auth
 import pandas as pd
@@ -63,12 +62,12 @@ class VectorStore(ABC):
         """Performs a similarity search on the vector store.
 
         Args:
-            query (str): The query text.
-            k (int, optional): The number of results to return. Defaults to 4.
+            query: The query text.
+            k: The number of results to return. Defaults to 4.
             **kwargs: Additional arguments to be passed to the underlying implementation.
 
         Returns:
-            List[Document]: A list of LangChain Document objects representing the results.
+            A list of LangChain Document objects representing the results.
         """
         pass
 
@@ -79,14 +78,14 @@ class VectorStore(ABC):
         """Performs a maximum marginal relevance (MMR) search on the vector store.
 
         Args:
-            query (str): The query text.
-            k (int, optional): The number of results to return. Defaults to 4.
-            fetch_k (int, optional):  The number of documents to initially retrieve. Defaults to 20
-            lambda_mult (float, optional): Multiplier for controlling MMR tradeoff. Defaults to 0.5.
+            query: The query text.
+            k: The number of results to return. Defaults to 4.
+            fetch_k:  The number of documents to initially retrieve. Defaults to 20
+            lambda_mult: Multiplier for controlling MMR tradeoff. Defaults to 0.5.
             **kwargs: Additional arguments to be passed to the underlying implementation.
 
         Returns:
-            List[Document]: A list of LangChain Document objects representing the results.
+            A list of LangChain Document objects representing the results.
         """
         pass
 
@@ -95,27 +94,29 @@ class VectorStrategy(ABC):
     """Abstract base class for defining vector embedding and index creation strategies.
 
     Attributes:
-        storage_interface (Storage): An interface for interacting with storage systems.
+        storage_interface: An interface for interacting with storage systems.
+        config: Configuration for the vector strategy.
     """
 
     def __init__(self, storage_interface: Storage, config: dict[str, str]):
+        """Initializes VectorStrategy with storage interface and configuration."""
         self.storage_interface = storage_interface
         self.config = config
 
     @abstractmethod
     def get_vector_indices(
         self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str
-    ):
+    ) -> dict[str, str]:
         """Retrieves or creates vector indices based on the provided configuration.
 
         Args:
-            regenerate (bool): If True, forces index regeneration.
-            embeddings (Embeddings): The embedding model to use for generating vector representations.
-            vector_indices (dict[str, str]): Existing vector indices (if any).
-            processed_files_dir (str): directory where files are stored
+            regenerate: If True, forces index regeneration.
+            embeddings: The embedding model to use for generating vector representations.
+            vector_indices: Existing vector indices (if any).
+            processed_files_dir: directory where files are stored
 
         Returns:
-            dict[str, str]: A dictionary mapping plan names to their corresponding vector indices.
+            A dictionary mapping plan names to their corresponding vector indices.
         """
         raise NotImplementedError("Cannot be invoked directly from abstract class")
 
@@ -124,18 +125,41 @@ class ChromaVectorStore(VectorStore):
     """Concrete implementation of VectorStore using Chroma for vector storage and search.
 
     Attributes:
-        chroma (Chroma): The Chroma instance for managing the vector store.
+        chroma: The Chroma instance for managing the vector store.
     """
 
-    def __init__(self, chroma):
+    def __init__(self, chroma: Chroma):
+        """Initializes ChromaVectorStore with a Chroma instance."""
         self.chroma = chroma
 
-    def similarity_search(self, query: str, k: int = 4, **kwargs):
+    def similarity_search(self, query: str, k: int = 4, **kwargs) -> list[Document]:
+        """Performs a similarity search using the Chroma vector store.
+
+        Args:
+            query: The query text.
+            k: The number of results to return. Defaults to 4.
+            **kwargs: Additional arguments passed to Chroma's similarity_search.
+
+        Returns:
+            A list of LangChain Document objects representing the results.
+        """
         return self.chroma.similarity_search(query, k, **kwargs)
 
     def max_marginal_relevance_search(
         self, query: str, k: int = 4, fetch_k: int = 20, lambda_mult: float = 0.5, **kwargs
-    ):
+    ) -> list[Document]:
+        """Performs MMR search using the Chroma vector store.
+
+        Args:
+            query: The query text.
+            k: The number of results to return. Defaults to 4.
+            fetch_k: The number of documents to initially retrieve. Defaults to 20.
+            lambda_mult: Multiplier for controlling MMR tradeoff. Defaults to 0.5.
+            **kwargs: Additional arguments passed to Chroma's MMR search.
+
+        Returns:
+            A list of LangChain Document objects representing the results.
+        """
         return self.chroma.max_marginal_relevance_search(query, k, fetch_k, lambda_mult, **kwargs)
 
 
@@ -143,21 +167,31 @@ class VertexVectorStore(VectorStore):
     """Concrete implementation of VectorStore using Vertex AI for vector storage and search.
 
     Attributes:
-        vertex (aiplatform.MatchingEngineIndexEndpoint): Vertex AI endpoint instance.
-        index_id (str): The ID of the Vertex AI index.
-        embeddings (Embeddings): The embedding model used for generating vectors.
-        doc_mapping (dict):  Mapping between document IDs and their textual content/metadata.
+        vertex: Vertex AI endpoint instance.
+        index_id: The ID of the Vertex AI index.
+        embeddings: The embedding model used for generating vectors.
+        doc_mapping:  Mapping between document IDs and their textual content/metadata.
     """
 
-    def __init__(self, vertex, index_id, embeddings, doc_mapping) -> None:
+    def __init__(
+        self, vertex: aiplatform.MatchingEngineIndexEndpoint, index_id: str, embeddings: Embeddings, doc_mapping: dict
+    ):
+        """Initializes VertexVectorStore with endpoint, index ID, embeddings, and document mapping."""
         self.vertex = vertex
         self.index_id = index_id
         self.embeddings = embeddings
         self.doc_mapping = doc_mapping
 
-    def convert_to_langchain(self, neighbours):
-        docs = []
+    def convert_to_langchain(self, neighbours: list) -> list[Document]:
+        """Converts Vertex AI search results to LangChain Documents.
 
+        Args:
+            neighbours: List of neighbors returned from Vertex AI search.
+
+        Returns:
+            List of LangChain Document objects.
+        """
+        docs = []
         for match in neighbours[0]:
             if match.id in self.doc_mapping:
                 text = self.doc_mapping[match.id][0]
@@ -166,7 +200,17 @@ class VertexVectorStore(VectorStore):
                 docs.append(doc)
         return docs
 
-    def similarity_search(self, query: str, k: int = 4, **kwargs):
+    def similarity_search(self, query: str, k: int = 4, **kwargs) -> list[Document]:
+        """Performs a similarity search using the Vertex AI vector store.
+
+        Args:
+            query: The query text.
+            k: The number of results to return. Defaults to 4.
+            **kwargs: Not used, present for compatibility.
+
+        Returns:
+            A list of LangChain Document objects representing the results.
+        """
         embs = self.embeddings.embed_documents([query])
         neighbours = self.vertex.find_neighbors(num_neighbors=k, queries=embs, deployed_index_id=self.index_id)
         docs = self.convert_to_langchain(neighbours)
@@ -174,7 +218,19 @@ class VertexVectorStore(VectorStore):
 
     def max_marginal_relevance_search(
         self, query: str, k: int = 4, fetch_k: int = 20, lambda_mult: float = 0.5, **kwargs
-    ):
+    ) -> list[Document]:
+        """Not supported by Vertex AI, delegates to similarity_search.
+
+        Args:
+            query: The query text.
+            k: The number of results to return. Defaults to 4.
+            fetch_k: Not used, present for compatibility.
+            lambda_mult: Not used, present for compatibility.
+            **kwargs: Not used, present for compatibility.
+
+        Returns:
+            A list of LangChain Document objects representing the results.
+        """
         # vertex AI does not support max marginal search, so we just use similarity search under the hood
         return self.similarity_search(query, k, **kwargs)
 
@@ -186,7 +242,7 @@ class VertexAISearchVectorStore(VectorStore):
     search and recommendation platform, to store and retrieve documents based on
     semantic similarity.
 
-    **Key Features:**
+    Key Features:
 
     * **Semantic Search:** Employs VAIS's advanced algorithms to understand the meaning of queries and documents,
     leading to more relevant results.
@@ -196,34 +252,34 @@ class VertexAISearchVectorStore(VectorStore):
     and improve recall.
     * **Spell Correction:** Automatically corrects spelling errors in queries to enhance search accuracy.
 
-    **Note:** This class is distinct from `VertexVectorStore`.
-              Ensure you are using the correct one based on your needs.
+    Note: This class is distinct from `VertexVectorStore`.
+          Ensure you are using the correct one based on your needs.
 
     Args:
-        project_id (str): Your Google Cloud Project ID.
-        engine_id (str): The ID of your Vertex AI Search engine.
-        location (str, optional): The location of your Vertex AI Search engine (defaults to "global").
+        project_id: Your Google Cloud Project ID.
+        engine_id: The ID of your Vertex AI Search engine.
+        data_store_id: The ID of your date store.
+        config: Configuration for the vector store.
 
     Attributes:
-        project_id (str): The Google Cloud Project ID.
-        location (str): The location of the Vertex AI Search engine.
-        engine_id (str): The ID of the Vertex AI Search engine.
+        project_id: The Google Cloud Project ID.
+        location: The location of the Vertex AI Search engine.
+        engine_id: The ID of the Vertex AI Search engine.
+        data_store_id: The ID of the date store.
+        config: Configuration for the vector store.
+        use_prev_and_next_pieces: Whether to include previous and next pieces of text.
+        location: The location of the Vertex AI Search resources.
+        vais_datastore_mode: The mode of the Vertex AI Search data store.
 
     Methods:
-        _search_sample(project_id, location, engine_id, search_query, k, filter, **kwargs):
-            Internal method to perform a search using Vertex AI Search.
-
-        similarity_search_with_score(query, k=4, filter=None, **kwargs):
-            Performs a semantic search with scores for relevance.
-
-        similarity_search(query, k=4, filter=None, **kwargs):
-            Performs a semantic search without scores (delegates to `similarity_search_with_score`).
-
-        max_marginal_relevance_search(query, k=4, fetch_k=20, lambda_mult=0.5, **kwargs):
-            Currently not implemented.
+        _search_sample: Internal method to perform a search using Vertex AI Search.
+        similarity_search_with_score: Performs a semantic search with scores for relevance.
+        similarity_search: Performs a semantic search without scores (delegates to `similarity_search_with_score`).
+        max_marginal_relevance_search: Currently not implemented.
     """
 
     def __init__(self, project_id: str, engine_id: str, data_store_id: str, config: dict):
+        """Initializes VertexAISearchVectorStore with project, engine, and data store IDs."""
         self.project_id = project_id
         self.engine_id = engine_id
         self.data_store_id = data_store_id
@@ -233,7 +289,18 @@ class VertexAISearchVectorStore(VectorStore):
         self.vais_datastore_mode = self.config.get("vais_datastore_mode", "extractive")
 
     @retry_with_exponential_backoff()
-    def perform_search_request(self, client, request):
+    def perform_search_request(
+        self, client: discoveryengine.SearchServiceClient, request: discoveryengine.SearchRequest
+    ) -> discoveryengine.SearchResponse:
+        """Performs a search request with retries.
+
+        Args:
+            client: Vertex AI Search client.
+            request: The search request.
+
+        Returns:
+            The search response.
+        """
         response = client.search(request)
         return response
 
@@ -244,9 +311,9 @@ class VertexAISearchVectorStore(VectorStore):
         engine_id: str,
         search_query: str,
         k: int = 4,
-        filter=filter,  # pylint: disable=redefined-builtin
+        filter: str = None,  # pylint: disable=redefined-builtin
         **kwargs,  # pylint: disable=unused-argument
-    ) -> List[discoveryengine.SearchResponse]:
+    ) -> list[tuple[Document, float]]:
         """Internal method to perform a raw search using Vertex AI Search.
 
         This method interacts with the Vertex AI Search API to retrieve documents
@@ -254,35 +321,18 @@ class VertexAISearchVectorStore(VectorStore):
         containing a Document object and its relevance score.
 
         Args:
-            project_id (str): Your Google Cloud Project ID.
-            location (str): The location of your Vertex AI Search engine.
-            engine_id (str): The ID of your Vertex AI Search engine.
-            search_query (str): The text query to search for.
-            k (int, optional): The number of results to return (defaults to 4).
-            filter (str, optional): A filter expression to narrow down results.
+            project_id: Your Google Cloud Project ID.
+            location: The location of your Vertex AI Search engine.
+            engine_id: The ID of your Vertex AI Search engine.
+            search_query: The text query to search for.
+            k: The number of results to return (defaults to 4).
+            filter: A filter expression to narrow down results.
 
         Returns:
-            List[Tuple[Document, float]]: A list of tuples where each tuple contains a Document
-                                         and its corresponding relevance score.
+            A list of tuples where each tuple contains a Document
+            and its corresponding relevance score.
         """
         docs = []
-
-        # response = self.discovery_engine_search(search_query, filter)
-        # ls = response['results']
-        # for item in ls:
-        #     try:
-        #         content = item['document']['derivedStructData']['extractive_answers'][0]['content']
-        #         metadata = item['document']['structData']
-        #         score = 0.9 # item.relevance_score
-        #         doc = Document(page_content=content)
-        #         doc.metadata = metadata
-        #         docs.append((doc, score))
-        #     except Exception as e:
-        #         print("Exception happened on parsing:", item)
-        #         print(e)
-        #         # self.token = self.gcloud_auth_token()
-        #         continue
-        # return docs
 
         client_options = (
             ClientOptions(api_endpoint=f"{self.location}-discoveryengine.googleapis.com")
@@ -337,8 +387,17 @@ class VertexAISearchVectorStore(VectorStore):
             docs = self.get_chunks(ls)
         else:
             raise ValueError("Not correct mode for vais is passed, should be chunk/extractive")
+        return docs
 
-    def get_chunks(self, ls: list) -> list[Document]:
+    def get_chunks(self, ls: list[discoveryengine.SearchResponse]) -> list[tuple[Document, float]]:
+        """Extracts document chunks from VAIS search results.
+
+        Args:
+            ls: List of VAIS SearchResult objects.
+
+        Returns:
+            List of tuples, each containing a Document and its score.
+        """
         docs = []
         for item in ls:
             try:
@@ -358,7 +417,7 @@ class VertexAISearchVectorStore(VectorStore):
 
                 content = f"{previous_content}\n{central_content}\n{next_content}"
                 metadata = map_composite_to_dict(item.chunk.document_metadata.struct_data)
-                score = 0.9  # we use 0.9 as default value, because we don't sort on relevancy score,
+                score = 0.9  # we use 0.9 as default value, because we don't sort on relevancy score
                 doc = Document(page_content=content)
                 doc.metadata = metadata
                 docs.append((doc, score))
@@ -420,7 +479,7 @@ class VertexAISearchVectorStore(VectorStore):
             filter (str, optional): A filter expression to apply to the search.
 
         Returns:
-            List[Tuple[Document, float]]: A list of tuples where each tuple contains a Document
+            list[tuple[Document, float]]: A list of tuples where each tuple contains a Document
                                          and its relevance score (higher is more relevant).
         """
         return self._search_sample(
@@ -447,7 +506,7 @@ class VertexAISearchVectorStore(VectorStore):
             filter (str, optional): A filter expression to apply to the search.
 
         Returns:
-            List[Document]: A list of the most relevant documents to the query.
+            list[Document]: A list of the most relevant documents to the query.
         """
         return self.similarity_search_with_score(query, k, filter)
 
@@ -527,14 +586,14 @@ class VertexAISearchVectorStrategy(VectorStrategy):
 
     Args:
         storage_interface (Storage): The LlamaIndex storage interface for data persistence.
-        config (Dict[str, str]): Configuration dictionary containing:
+        config (dict[str, str]): Configuration dictionary containing:
             * "dataset_name": The name for the VAIS dataset.
             * "bq_project_id": The Google Cloud project ID for Vertex AI and BigQuery.
         vectore_store_path (str): The base directory to store VAIS configuration.
 
     Attributes:
         vectore_store_path (str): The directory to store VAIS configuration.
-        config (Dict[str, str]): The configuration dictionary.
+        config (dict[str, str]): The configuration dictionary.
     """
 
     def __init__(self, storage_interface: Storage, config: dict[str, str], vectore_store_path: str) -> None:
@@ -558,7 +617,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         Args:
             regenerate (bool): Unused argument (kept for compatibility with base class).
             embeddings (Embeddings): Unused argument (kept for compatibility with base class).
-            vector_indices (Dict[str, str]): Unused argument (kept for compatibility with base class).
+            vector_indices (dict[str, str]): Unused argument (kept for compatibility with base class).
             processed_files_dir (str): The directory containing processed files for VAIS.
 
         Returns:
