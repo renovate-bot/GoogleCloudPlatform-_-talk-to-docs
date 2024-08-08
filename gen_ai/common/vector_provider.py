@@ -23,21 +23,23 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List
 
+import google.auth
 import pandas as pd
 import requests
 import tqdm
 from google.api_core.client_options import ClientOptions
 from google.cloud import aiplatform
-from google.cloud import discoveryengine_v1 as discoveryengine
+from google.cloud import discoveryengine_v1alpha as discoveryengine
 from google.cloud import storage
 from langchain.schema import Document
 from langchain.schema.embeddings import Embeddings
 from langchain.vectorstores import Chroma
 
+from gen_ai.common.chroma_utils import map_composite_to_dict
 from gen_ai.common.common import default_extract_data
+from gen_ai.common.exponential_retry import retry_with_exponential_backoff
 from gen_ai.common.inverted_index import InvertedIndex
 from gen_ai.common.storage import Storage
-from gen_ai.common.chroma_utils import map_composite_to_dict
 
 
 @dataclass
@@ -221,11 +223,19 @@ class VertexAISearchVectorStore(VectorStore):
             Currently not implemented.
     """
 
-    def __init__(self, project_id: str, engine_id: str, use_prev_and_next_segments: bool):
+    def __init__(
+        self, project_id: str, engine_id: str, data_store_id: str, use_prev_and_next_pieces: int, location: str
+    ):
         self.project_id = project_id
-        self.location = "global"
         self.engine_id = engine_id
-        self.use_prev_and_next_segments = use_prev_and_next_segments
+        self.data_store_id = data_store_id
+        self.use_prev_and_next_pieces = use_prev_and_next_pieces
+        self.location = location
+
+    @retry_with_exponential_backoff()
+    def perform_search_request(self, client, request):
+        response = client.search(request)
+        return response
 
     def _search_sample(
         self,
@@ -255,27 +265,33 @@ class VertexAISearchVectorStore(VectorStore):
             List[Tuple[Document, float]]: A list of tuples where each tuple contains a Document
                                          and its corresponding relevance score.
         """
-        client_options = (
-            ClientOptions(api_endpoint=f"{location}-discoveryengine.googleapis.com") if location != "global" else None
-        )
+        docs = []
 
+        # response = self.discovery_engine_search(search_query, filter)
+        # ls = response['results']
+        # for item in ls:
+        #     try:
+        #         content = item['document']['derivedStructData']['extractive_answers'][0]['content']
+        #         metadata = item['document']['structData']
+        #         score = 0.9 # item.relevance_score
+        #         doc = Document(page_content=content)
+        #         doc.metadata = metadata
+        #         docs.append((doc, score))
+        #     except Exception as e:
+        #         print("Exception happened on parsing:", item)
+        #         print(e)
+        #         # self.token = self.gcloud_auth_token()
+        #         continue
+        # return docs
+
+        client_options = (
+            ClientOptions(api_endpoint=f"{self.location}-discoveryengine.googleapis.com")
+            if self.location != "global"
+            else None
+        )
         client = discoveryengine.SearchServiceClient(client_options=client_options)
-        # this is VAIS as a generator
-        # uncomment it if you want not just retriever but generator also
-        # summary_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec(
-        #     summary_result_count=10,
-        #     include_citations=True,
-        #     ignore_adversarial_query=True,
-        #     ignore_non_summary_seeking_query=True,
-        #     model_prompt_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec.ModelPromptSpec(
-        #         preamble="Here is the question"
-        #     ),
-        #     model_spec=discoveryengine.SearchRequest.ContentSearchSpec.SummarySpec.ModelSpec(
-        #         version="stable",
-        #     ),
-        # ),
         serving_config = (
-            f"projects/{project_id}/locations/{location}/"
+            f"projects/{project_id}/locations/{self.location}/"
             f"collections/default_collection/engines/{engine_id}/"
             "servingConfigs/default_config"
         )
@@ -283,8 +299,8 @@ class VertexAISearchVectorStore(VectorStore):
             extractive_content_spec=discoveryengine.SearchRequest.ContentSearchSpec.ExtractiveContentSpec(
                 max_extractive_segment_count=1,
                 return_extractive_segment_score=True,
-                num_previous_segments=1 if self.use_prev_and_next_segments else 0,
-                num_next_segments=1 if self.use_prev_and_next_segments else 0,
+                num_previous_segments=self.use_prev_and_next_segments,
+                num_next_segments=self.use_prev_and_next_segments,
             ),
         )
         request = discoveryengine.SearchRequest(
@@ -301,19 +317,18 @@ class VertexAISearchVectorStore(VectorStore):
             ),
         )
 
-        response = client.search(request)
+        response = self.perform_search_request(client, request)
         ls = response.results
-        docs = []
         for item in ls:
             try:
                 extractive_segment = item.document.derived_struct_data["extractive_segments"][0]
                 previous_content = (
-                    extractive_segment["previous_segments"][0]["content"] + "\n"
+                    self._build_extractive_content(extractive_segment["previous_segments"], True)
                     if "previous_segments" in extractive_segment
                     else ""
                 )
                 next_content = (
-                    extractive_segment["next_segments"][0]["content"] + "\n"
+                    self._build_extractive_content(extractive_segment["next_segments"])
                     if "next_segments" in extractive_segment
                     else ""
                 )
@@ -329,8 +344,18 @@ class VertexAISearchVectorStore(VectorStore):
                 print("Exception happened on parsing:", item.document.struct_data["data_source"])
                 print(e)
                 continue
-
+        # return docs
         return sorted(docs, key=lambda x: x[1], reverse=True)
+
+    def _build_extractive_content(self, segments: list, reverse: bool = False) -> str:
+        content = []
+        for i in range(len(segments)):
+            content.append(segments[i]["content"])
+            content.append("\n")
+
+        if reverse:
+            content = content[::-1]
+        return "".join(content)
 
     def similarity_search_with_score(
         self, query: str, k: int = 4, filter: str = None, **kwargs
@@ -464,7 +489,11 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         super().__init__(storage_interface, config)
         self.vectore_store_path = f"{vectore_store_path}_vais"
         self.config = config
-        self.base_url = "https://discoveryengine.googleapis.com/v1"
+        self.location = self.config.get("vais_location", "global")
+        if self.location == "global":
+            self.base_url = "https://discoveryengine.googleapis.com/v1"
+        else:
+            self.base_url = f"https://{self.location}-discoveryengine.googleapis.com/v1"
 
     def get_vector_indices(
         self, regenerate: bool, embeddings: Embeddings, vector_indices: dict[str, str], processed_files_dir: str
@@ -484,13 +513,22 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             VertexAISearchVectorStore: A Vertex AI Search-backed vector store instance.
         """
         aiplatform.init()
+        project_id = self.config.get("bq_project_id")
+        if not project_id:
+            _, project_id = google.auth.default()
+
+        waize_data_store = self.config.get("vais_data_store")
+        waize_engine_id = self.config.get("vais_engine_id")
+        if waize_data_store and waize_engine_id:
+            print("VAIS engine and data store values provided in llm.yaml")
+            self.__serialize_engine_id(waize_engine_id, waize_data_store, "engine_and_store_already_exist")
+
         if not os.path.exists(self.vectore_store_path):
             print("No VAIS vector store found, creating one...")
             dataset_name = self.config.get("dataset_name")
-            project_id = self.config.get("bq_project_id")
 
             waize_gcs_uri = self.__prepare_waize_format(processed_files_dir, dataset_name)
-            waize_data_store = self.__create_waize_data_store(project_id, dataset_name)
+            waize_data_store = self.__create_waize_data_store(project_id, dataset_name, self.location)
             waize_data_store = self.__import_data_to_waize_data_store(project_id, waize_data_store, waize_gcs_uri)
             waize_engine_id = self.__create_waize_app(project_id, dataset_name, waize_data_store)
             self.__serialize_engine_id(waize_engine_id, waize_data_store, waize_gcs_uri)
@@ -498,10 +536,10 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             time.sleep(90)  # timeout for enterprise features to activate. Talk to Hossein about it
         else:
             print("VAIS vector store exists, retrieving the values...")
-        waize_engine_id = self.__deserialize_engine_id()
+        waize_engine_id, waize_data_store = self.__deserialize_engine_id()
 
         return VertexAISearchVectorStore(
-            self.config.get("bq_project_id"), waize_engine_id, self.config.get("use_prev_and_next_segments", 0)
+            project_id, waize_engine_id, waize_data_store, self.config.get("use_prev_and_next_pieces", 0)
         )
 
     def __deserialize_engine_id(self):
@@ -514,7 +552,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         with open(vais_path, "r", encoding="utf-8") as f:
             vais_urls = json.load(f)
         print(f"VAIS urls are: \n {vais_urls}")
-        return vais_urls["vais_engine_id"]
+        return vais_urls["vais_engine_id"], vais_urls["vais_data_store"]
 
     def __serialize_engine_id(self, waize_engine_id, waize_data_store, waize_gcs_uri):
         """Serializes the VAIS engine ID and related URLs to a JSON file.
@@ -591,7 +629,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
 
         return new_bucket_name
 
-    def __create_waize_data_store(self, project_id, dataset_name):
+    def __create_waize_data_store(self, project_id, dataset_name, location):
         """Creates a data store in Vertex AI Search.
 
         Args:
@@ -616,16 +654,32 @@ class VertexAISearchVectorStrategy(VectorStrategy):
 
         url = (
             f"https://discoveryengine.googleapis.com/v1alpha/projects/{project_id}/"
-            f"locations/global/collections/default_collection/dataStores"
+            f"locations/{location}/collections/default_collection/dataStores"
             f"?dataStoreId={new_data_store}"
         )
-
-        data = {
-            "displayName": f"{new_data_store_name}",
-            "industryVertical": "GENERIC",
-            "solutionTypes": ["SOLUTION_TYPE_SEARCH"],
-            "contentConfig": "CONTENT_REQUIRED",
-        }
+        if self.config.get("vais_datastore_mode", "extractive") == "extractive":
+            data = {
+                "displayName": f"{new_data_store_name}",
+                "industryVertical": "GENERIC",
+                "solutionTypes": ["SOLUTION_TYPE_SEARCH"],
+                "contentConfig": "CONTENT_REQUIRED",
+            }
+        else:
+            data = {
+                "displayName": f"{new_data_store_name}",
+                "industryVertical": "GENERIC",
+                "solutionTypes": ["SOLUTION_TYPE_SEARCH"],
+                "contentConfig": "CONTENT_REQUIRED",
+                "documentProcessingConfig": {
+                    "chunkingConfig": {
+                        "layoutBasedChunkingConfig": {
+                            "chunkSize": 500,
+                            "includeAncestorHeadings": True,
+                        }
+                    },
+                    "defaultParsingConfig": {"layoutParsingConfig": {}},
+                },
+            }
 
         response = requests.post(url, headers=headers, json=data, timeout=3600)
 
