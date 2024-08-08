@@ -626,6 +626,8 @@ class VertexAISearchVectorStrategy(VectorStrategy):
                 outfile.write(json.dumps(entry) + "\n")
             jsonl_blob = new_bucket.blob(jsonl_path)
             jsonl_blob.upload_from_filename(jsonl_path)
+        if os.path.exists(jsonl_path):
+            os.remove(jsonl_path)
 
         return new_bucket_name
 
