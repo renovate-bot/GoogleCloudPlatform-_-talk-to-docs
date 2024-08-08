@@ -3,7 +3,7 @@
 # Project and User specific configuration
 bq_project_id: project_name # change for the user's project id
 dataset_name: dataset_name # change for new project
-gcs_source_bucket: gs://bucket location # change for new project, 
+gcs_source_bucket: gs://bucket location # change for new project
 terraform_credentials: terraform-service-account-credentials.json # change for the user
 terraform_instance_name: talk-to-docs-instance
 terraform_redis_name: talk-to-docs-redis-instance
