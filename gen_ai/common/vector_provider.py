@@ -425,8 +425,21 @@ class VertexAISearchVectorStore(VectorStore):
                 print("Exception happened on parsing:", item)
                 print(e)
                 continue
+        return docs
 
-    def _build_next_and_previous_content(self, chunks: list, content_functor: callable, reverse: bool = False) -> str:
+    def _build_next_and_previous_content(
+        self, chunks: list[discoveryengine.SearchResponse], content_functor: callable, reverse: bool = False
+    ) -> str:
+        """Constructs the content from previous or next chunks.
+
+        Args:
+            chunks: List of chunks to extract content from.
+            content_functor: Function to apply to each chunk to get its content.
+            reverse: Whether to reverse the order of chunks.
+
+        Returns:
+            The combined content from the chunks.
+        """
         content = []
         for i in range(len(chunks)):
             content.append(content_functor(chunks[i]))
@@ -436,7 +449,15 @@ class VertexAISearchVectorStore(VectorStore):
             content = content[::-1]
         return "".join(content)
 
-    def get_extractive_segments(self, ls: list) -> list[Document]:
+    def get_extractive_segments(self, ls: list[discoveryengine.SearchResponse]) -> list[tuple[Document, float]]:
+        """Extracts extractive segments from VAIS search results.
+
+        Args:
+            ls: List of VAIS SearchResult objects.
+
+        Returns:
+            List of tuples, each containing a Document and its score.
+        """
         docs = []
         for item in ls:
             try:
@@ -470,17 +491,18 @@ class VertexAISearchVectorStore(VectorStore):
 
     def similarity_search_with_score(
         self, query: str, k: int = 4, filter: str = None, **kwargs
-    ):  # pylint: disable=redefined-builtin
+    ) -> list[tuple[Document, float]]:  # pylint: disable=redefined-builtin
         """Performs a semantic similarity search and returns results with scores.
 
         Args:
-            query (str): The query text to search for.
-            k (int, optional): The number of top results to return (defaults to 4).
-            filter (str, optional): A filter expression to apply to the search.
+            query: The query text to search for.
+            k: The number of top results to return (defaults to 4).
+            filter: A filter expression to apply to the search.
+            **kwargs: Additional keyword arguments (not used).
 
         Returns:
-            list[tuple[Document, float]]: A list of tuples where each tuple contains a Document
-                                         and its relevance score (higher is more relevant).
+            A list of tuples where each tuple contains a Document
+            and its relevance score (higher is more relevant).
         """
         return self._search_sample(
             project_id=self.project_id,
@@ -494,25 +516,26 @@ class VertexAISearchVectorStore(VectorStore):
 
     def similarity_search(
         self, query: str, k: int = 4, filter: str = None, **kwargs
-    ):  # pylint: disable=redefined-builtin
+    ) -> list[Document]:  # pylint: disable=redefined-builtin
         """Performs a semantic similarity search and returns documents only.
 
         This method is a convenience wrapper around `similarity_search_with_score` that
         discards the relevance scores.
 
         Args:
-            query (str): The query text to search for.
-            k (int, optional): The number of top results to return (defaults to 4).
-            filter (str, optional): A filter expression to apply to the search.
+            query: The query text to search for.
+            k: The number of top results to return (defaults to 4).
+            filter: A filter expression to apply to the search.
+            **kwargs: Additional keyword arguments (not used).
 
         Returns:
-            list[Document]: A list of the most relevant documents to the query.
+            A list of the most relevant documents to the query.
         """
-        return self.similarity_search_with_score(query, k, filter)
+        return [doc for doc, _ in self.similarity_search_with_score(query, k, filter)]
 
     def max_marginal_relevance_search(
         self, query: str, k: int = 4, fetch_k: int = 20, lambda_mult: float = 0.5, **kwargs
-    ):
+    ) -> list[Document]:
         """Not currently implemented."""
         return []
 
