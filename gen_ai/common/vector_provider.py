@@ -490,8 +490,8 @@ class VertexAISearchVectorStore(VectorStore):
         return sorted(docs, key=lambda x: x[1], reverse=True)
 
     def similarity_search_with_score(
-        self, query: str, k: int = 4, filter: str = None, **kwargs
-    ) -> list[tuple[Document, float]]:  # pylint: disable=redefined-builtin
+        self, query: str, k: int = 4, filter: str = None, **kwargs  # pylint: disable=redefined-builtin
+    ) -> list[tuple[Document, float]]:
         """Performs a semantic similarity search and returns results with scores.
 
         Args:
@@ -515,8 +515,8 @@ class VertexAISearchVectorStore(VectorStore):
         )
 
     def similarity_search(
-        self, query: str, k: int = 4, filter: str = None, **kwargs
-    ) -> list[Document]:  # pylint: disable=redefined-builtin
+        self, query: str, k: int = 4, filter: str = None, **kwargs  # pylint: disable=redefined-builtin
+    ) -> list[Document]:
         """Performs a semantic similarity search and returns documents only.
 
         This method is a convenience wrapper around `similarity_search_with_score` that
