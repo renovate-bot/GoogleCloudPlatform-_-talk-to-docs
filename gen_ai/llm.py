@@ -406,6 +406,7 @@ def respond_api(question: str, member_context_full: PersonalizedData | dict[str,
     if isinstance(member_context_full, PersonalizedData):
         member_context_full = transform_to_dictionary(member_context_full)
     query_state = QueryState(question=question, all_sections_needed=[])
+    query_state.original_question = Container.original_question if hasattr(Container, 'original_question') else None
     conversation = Conversation(exchanges=[query_state])
     conversation = respond(conversation, member_context_full)
     return conversation

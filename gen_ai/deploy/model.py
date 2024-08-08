@@ -182,6 +182,7 @@ class QueryState:
         time_taken: The time taken to generate the answer.
         confidence_score: Confidence score of the answer of the final round
         custom_fields: Dictionary from list of dictionaries, that represents information specific to use case
+        original_question: Original question before enhancements
     """
 
     question: str
@@ -199,6 +200,7 @@ class QueryState:
     time_taken: int = field(default=0)
     confidence_score: int = field(default=0)
     custom_fields: dict[str, list[dict[str, str]]] = field(default_factory=dict)
+    original_question: str | None = field(default=None)
 
 
 @dataclass
