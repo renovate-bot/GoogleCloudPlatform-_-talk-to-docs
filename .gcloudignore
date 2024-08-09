@@ -1,3 +1,20 @@
+#  https://cloud.google.com/sdk/gcloud/reference/topic/gcloudignore
+
+# Git
+**/.git
+**/.git/*
+
+# Terraform
+**/.terraform
+.terraform.lock.hcl
+
+# Local temporary directory
+**/.tmp
+
+# MacOS
+.DS_Store
+
+# Everything from .gitignore
 # Created by https://www.toptal.com/developers/gitignore/api/python,pycharm+all
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,pycharm+all
 
@@ -270,7 +287,8 @@ poetry.toml
 *.txt
 !requirements.txt
 *.yml
-.env_gradio
+## Ensure Cloud Build retrieves the .env file for Gradio.
+!.env_gradio
 
 ## folders
 .vscode/
