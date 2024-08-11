@@ -93,6 +93,10 @@ output "backend_id" {
   value       = module.cloud_run_api.cloudrun_backend_service_id
 
 }
+output "custom_audience" {
+  description = "The custom audience used for authenticated calls to the T2X API Cloud Run service."
+  value       = module.cloud_run_api.cloudrun_custom_audiences[0]
+}
 
 output "docker_image_ui" {
   description = "The Docker image used by the T2X API backend service."
@@ -103,6 +107,21 @@ output "backend_id_ui" {
   description = "The ID of the T2X Cloud run UI backend service"
   value       = module.cloud_run_ui.cloudrun_backend_service_id
 
+}
+
+output "custom_audience_ui" {
+  description = "The custom audience used for authenticated calls to the T2X UI Cloud Run service."
+  value       = module.cloud_run_ui.cloudrun_custom_audiences[0]
+}
+
+output "health_check_url" {
+  description = "The URL to use to check the health of the T2X API Cloud Run service"
+  value       = "${module.cloud_run_api.cloudrun_custom_audiences[0]}/health"
+}
+
+output "terraform_service_account" {
+  description = "The Terraform provisioning service account email address."
+  value       = var.terraform_service_account
 }
 
 output "doc_ingestion_workflow_service_account" {

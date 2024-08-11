@@ -78,49 +78,48 @@ terraform {
 ## Flexible Backends - Partial Configuration
 ([return to top](#terraform-overview))
 - Backend declaration can't accept input variables or use expansion/interpolation because Terraform loads the backend config before anything else.
-- A 'partial configuration' in the `terraform.backend` block allows flexible backend definition for multiple environments.
+- A [partial configuration](https://developer.hashicorp.com/terraform/language/settings/backends/configuration#partial-configuration) in the `terraform.backend` block allows flexible backend definition for multiple environments.
+- Partial configurations allow you to include some attributes in the `terraform.backend` block and pass the rest from another source.
 - Options for supplying backend configuration arguments include a file, command-line key/value arguments, [environment variables](https://developer.hashicorp.com/terraform/cli/config/environment-variables), or interactive prompts.
 - Define the remaining backend details in a dedicated `*.gcs.tfbackend` file, i.e. `backend_sandbox.gcs.tfbackend` and pass it's path as a command-line argument to separate backends per environment. (Hashicorp docs recommend a `*.backendname.tfbackend` naming convention, but Terraform will accept any correctly-formatted file. IDE syntax highlighting and linting might not pick up `.tfbackend` files.)
 
-Example 1 - environment-specific backend configuration file:
+### Partial backend configuration example:
+`backend.tf`:
+```hcl
+terraform {
+  backend "gcs" {
+    prefix = "bootstrap"
+  }
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = ">=5.25.0"
+    }
+  }
+  required_version = ">= 0.13"
+}
+
+```
+
+- Example 1 - initialize a partial backend using an environment-specific backend configuration file:
 ```sh
 # Create a workspace-specific backend configuration file for the Google Cloud Storage backend.
 cat << EOF > backend_$ENVIRONMENT.gcs.tfbackend
-bucket = "my-terraform-bucket"
-prefix = "terraform_state/"
+bucket                      = "terraform-state-my-project-id"
+impersonate_service_account = "terraform-service-account@my-project-id.iam.gserviceaccount.com"
 EOF
 
 # Initialize the remote state
 tf init -backend-config="backend_$ENVIRONMENT.gcs.tfbackend"
 ```
 
-Partial configurations allow you to include some attributes in the `terraform.backend` block and pass the rest from another source.
-
-Example 2 - define a common file path/prefix in the `terraform.backend` block and choose the GCS bucket and service account to impersonate using configuration options.
-
-`backend.tf`:
-```terraform
-terraform {
-  backend "gcs" {
-    prefix = "terraform_state/core_resources"
-  }
-  required_providers {
-    google = {
-      source  = "hashicorp/google"
-      version = "5.25.0"
-    }
-  }
-  required_version = ">= 0.13"
-}
-```
-
-`.tfbackend` file:
+- Example 2 - initialize a partial backend using command-line arguments:
 ```sh
-cat << EOF > backend_$ENVIRONMENT.gcs.tfbackend
-bucket                      = "my-terraform-bucket"
-impersonate_service_account = "terraform-sa@my-project.iam.gserviceaccount.com"
-EOF
+tf init -backend-config="bucket=terraform-state-my-project-id" -backend-config="impersonate_service_account=terraform-service-account@my-project-id.iam.gserviceaccount.com"
 ```
+
+
+
 
 ## Reconfiguring a Backend
 ([return to top](#terraform-overview))

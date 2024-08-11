@@ -56,23 +56,37 @@ resource "google_storage_bucket" "default_backend_bucket" {
 
 
   website {
-    main_page_suffix = "index.html"
-    not_found_page   = "404.html"
+    main_page_suffix = "public/index.html"
+    not_found_page   = "public/404.html"
   }
 
   force_destroy = true
 }
 
+resource "google_storage_managed_folder" "folder" {
+  bucket = google_storage_bucket.default_backend_bucket.name
+  name   = "public/"
+}
+
+resource "google_storage_managed_folder_iam_member" "public_viewer" {
+  bucket         = google_storage_managed_folder.folder.bucket
+  managed_folder = google_storage_managed_folder.folder.name
+  role           = "roles/storage.objectViewer"
+  member         = "allUsers"
+}
+
 resource "google_storage_bucket_object" "index" {
-  name    = "index.html"
-  content = "<html><body><h1>Hello, World!</h1></body></html>"
-  bucket  = google_storage_bucket.default_backend_bucket.name
+  name         = "${google_storage_managed_folder.folder.name}index.html"
+  content      = "<html><body><h1>Hello, World!</h1></body></html>"
+  content_type = "text/html"
+  bucket       = google_storage_bucket.default_backend_bucket.name
 }
 
 resource "google_storage_bucket_object" "not_found" {
-  name    = "404.html"
-  content = "<html><body><h1>Uh oh</h1></body></html>"
-  bucket  = google_storage_bucket.default_backend_bucket.name
+  name         = "${google_storage_managed_folder.folder.name}404.html"
+  content      = "<html><body><h1>Uh oh</h1></body></html>"
+  content_type = "text/html"
+  bucket       = google_storage_bucket.default_backend_bucket.name
 }
 
 resource "google_compute_backend_bucket" "default_backend_bucket" {
