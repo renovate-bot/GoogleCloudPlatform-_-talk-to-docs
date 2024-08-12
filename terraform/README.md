@@ -297,6 +297,7 @@ gcloud builds submit . --config=cloudbuild.yaml --project=$PROJECT --region=$REG
 - Use the public IP address created by Terraform as the A record in your DNS host.
 - **NOTE** A newly-created managed TLS certificate may take anywhere from 10-15 minutes up to 24 hours for the CA to sign after DNS propagates.
 - The Certificate [Managed status](https://cloud.google.com/load-balancing/docs/ssl-certificates/troubleshooting#certificate-managed-status) will change from PROVISIONING to ACTIVE when it's ready to use.
+- Navigate to Network Services > Load balancing > select the load balancer > Frontend: Certificate > Select the certificate and wait for the status to change to ACTIVE.
 ![Active Managed Certificate](assets/cert_active.png)
 
 
@@ -312,7 +313,7 @@ gcloud builds submit . --config=cloudbuild.yaml --project=$PROJECT --region=$REG
 ```sh
 export PROJECT='my-project-id' # replace with your project ID
 export AUDIENCE='https://34.54.24.62.nip.io/t2x-api' # replace with the Cloud Run Custom Audience (uses load balancer domain or nip.io domain plus the Cloud Run service name as the '/path') - will be displayed in Terraform outputs as 'custom_audience'.
-export TOKEN=$(gcloud auth print-identity-token --impersonate-service-account="terraform-service-account@${PROJECT}.iam.gserviceaccount.com"   --audiences=$AUDIENCE)
+export TOKEN=$(gcloud auth print-identity-token --impersonate-service-account="terraform-service-account@${PROJECT}.iam.gserviceaccount.com" --audiences=$AUDIENCE)
 curl -X GET -H "Authorization: Bearer ${TOKEN}" "${AUDIENCE}/health"
 ```
 
@@ -391,9 +392,10 @@ gcloud storage cp -r "gs://$SOURCE_BUCKET/$DATASET_NAME/*" "gs://$STAGING_BUCKET
 ```sh
 export PROJECT='my-project-id' # replace with your project ID
 export REGION='us-central1'
-export EXTRACTION_PATH='{source_extractions_folder_path}' # replace with the source extractions folder path
+export DATASET_NAME='{source_extractions_folder_path}' # replace with the source extractions folder path
+# i.e. with the full source path URI as 'gs://source-extractions-bucket/extractions20240715' -> 'extractions20240715'
 
-gcloud workflows execute t2x-doc-ingestion-workflow --project=$PROJECT --location=$REGION --data="{\"dataset_name\":\"$EXTRACTION_PATH\"}" --impersonate-service-account=terraform-service-account@${PROJECT}.iam.gserviceaccount.com
+gcloud workflows execute t2x-doc-ingestion-workflow --project=$PROJECT --location=$REGION --data="{\"dataset_name\":\"$DATASET_NAME\"}" --impersonate-service-account=terraform-service-account@${PROJECT}.iam.gserviceaccount.com
 # Impersonation my not be required if your user account has the required permission to execute the workflow.
 ```
 - Check the progress in the console or by issuing the `gcloud` command returned by `gcloud workflows execute`.
@@ -440,6 +442,7 @@ gcloud workflows executions wait-last
 12. Add a Google Identity (i.e a user or group) with the "IAP-secured Web App User" role.  
 13. You may see an "Error: Forbidden" message for about the first 5 minutes, but after that users with the "IAP-secured Web App User" role on the Project or IAP backend service should be able to access the app via the domain on the Load Balancer certificate plus the service path.
     - i.e. `https://app.example.com/t2x-ui/` or `https://35.244.148.105.nip.io/t2x-ui/`
+    - The load balancer path requires a trailing slash `/`.
 
 
 &nbsp;
