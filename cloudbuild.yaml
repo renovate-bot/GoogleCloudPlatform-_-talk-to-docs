@@ -37,18 +37,8 @@ steps:
   name: 'hashicorp/terraform:latest'
   dir: 'terraform/main'
   script: |
-    ### Uncomment the following block to enable dynamic backend configuration.
-    # echo ""
-    # echo "Set the Remote State Bucket Name for the current project. Processing backend_template.hcl..."
-    # sed "s/^ *bucket = .*/    bucket = \"terraform-state-${PROJECT_ID}\"/g" backend_template.hcl > terraform_backend.tf
-    # echo ""
-    # echo "terraform_backend.tf content:"
-    # echo '```hcl'
-    # cat terraform_backend.tf
-    # echo '```'
-    ### End dynamic backend configuration block.
     echo ""
-    terraform init -reconfigure
+    terraform init -reconfigure -backend-config="bucket=terraform-state-${PROJECT_ID}" -backend-config="impersonate_service_account=terraform-service-account@${PROJECT_ID}.iam.gserviceaccount.com"
     echo ""
     echo "Terraform version:"
     echo ""
@@ -72,7 +62,10 @@ steps:
   name: 'hashicorp/terraform:latest'
   dir: 'terraform/main'
   env:
-    - TF_VAR_docker_image={t2x-api="${_API_DOCKER_IMAGE}:${BUILD_ID}", t2x-ui="${_UI_DOCKER_IMAGE}:${BUILD_ID}"}
+    - TF_VAR_project_id=${PROJECT_ID}
+    - TF_VAR_terraform_service_account=terraform-service-account@${PROJECT_ID}.iam.gserviceaccount.com
+    - TF_VAR_docker_image=${_API_DOCKER_IMAGE}:${BUILD_ID}
+    - TF_VAR_docker_image_ui=${_UI_DOCKER_IMAGE}:${BUILD_ID}
   args: ['plan', '-input=false', '-out', '.terraform/tfplan']
 
 - id: apply
