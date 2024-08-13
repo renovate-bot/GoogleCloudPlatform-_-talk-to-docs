@@ -69,7 +69,6 @@ Terraform modules to stage and deploy the application components. The `bootstrap
 ```sh
 terraform/ # this directory
 ├── README.md # this file
-├── terraform_overview.md # general Terraform setup and configuration instructions
 ├── assets/ # architecture diagrams
 ├── bootstrap/ # provision project APIs, Cloud Build service account, IAM roles, and staging bucket
 ├── main/ # provision the talk-to-docs service components
