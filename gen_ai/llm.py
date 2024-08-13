@@ -37,15 +37,18 @@ from langchain.chains import LLMChain
 from gen_ai.common.argo_logger import create_log_snapshot
 from gen_ai.common.bq_utils import load_data_to_bq
 from gen_ai.common.common import merge_outputs, remove_duplicates
+from gen_ai.common.document_utils import generate_contexts_from_docs
+from gen_ai.common.exponential_retry import concurrent_best_reduce
 from gen_ai.common.ioc_container import Container
 from gen_ai.common.memorystore_utils import serialize_previous_conversation
-from gen_ai.common.react_utils import filter_non_relevant_previous_conversations, get_confidence_score
-from gen_ai.common.retriever import perform_retrieve_round, retrieve_initial_documents
+from gen_ai.common.react_utils import (
+    filter_non_relevant_previous_conversations, get_confidence_score)
+from gen_ai.common.retriever import (perform_retrieve_round,
+                                     retrieve_initial_documents)
 from gen_ai.common.statefullness import resolve_and_enrich, serialize_response
-from gen_ai.common.exponential_retry import concurrent_best_reduce
-from gen_ai.common.document_utils import generate_contexts_from_docs
 from gen_ai.custom_client_functions import fill_query_state_with_doc_attributes
-from gen_ai.deploy.model import Conversation, PersonalizedData, QueryState, transform_to_dictionary
+from gen_ai.deploy.model import (Conversation, PersonalizedData, QueryState,
+                                 transform_to_dictionary)
 
 
 def get_total_count(question: str, selected_context: str, previous_rounds: str, final_round_statement: str) -> str:
@@ -406,7 +409,55 @@ def respond_api(question: str, member_context_full: PersonalizedData | dict[str,
     if isinstance(member_context_full, PersonalizedData):
         member_context_full = transform_to_dictionary(member_context_full)
     query_state = QueryState(question=question, all_sections_needed=[])
-    query_state.original_question = Container.original_question if hasattr(Container, 'original_question') else None
+    query_state.original_question = Container.original_question if hasattr(Container, "original_question") else None
     conversation = Conversation(exchanges=[query_state])
     conversation = respond(conversation, member_context_full)
     return conversation
+
+
+def enhance_question(question: str, enhanced_string: str) -> str:
+    """Enhances the question with the provided string as determined in enhanced_prompt"""
+    enhance_question_chain = Container.enhance_question_chain
+    enhanced_question = enhance_question_chain().run(
+        question=question,
+        member_context=enhanced_string,
+    )
+    enhanced_question = eval(enhanced_question)
+    enhanced_question = enhanced_question["appended_question_with_member_context"]
+    return enhanced_question
+
+
+def golden_scoring_answer(question: str, expected_answer: str, actual_answer: str) -> int:
+    """Checks how good is the answer for the question"""
+    golden_answer_scoring_chain = Container.golden_answer_scoring_chain
+    json_corrector_chain = Container.json_corrector_chain
+    output_raw = golden_answer_scoring_chain().run(
+        question=question,
+        expected_answer=expected_answer,
+        actual_answer=actual_answer,
+    )
+    try:
+        output_raw = output_raw.replace("```json", "").replace("```", "")
+        output = json5.loads(output_raw)
+    except Exception:  # pylint: disable=W0718
+        json_output = json_corrector_chain().run(json=output_raw)
+        json_output = json_output.replace("```json", "").replace("```", "")
+        output = json5.loads(json_output)
+
+    return int(output["correctness_score"])
+
+
+def substring_matching(left_string: str, right_string: str) -> int:
+    """Checks how good much of left string is contained in right string"""
+    string_matcher_chain = Container.string_matcher_chain
+    json_corrector_chain = Container.json_corrector_chain
+    output_raw = string_matcher_chain().run(left_string=left_string, right_string=right_string)
+    try:
+        output_raw = output_raw.replace("```json", "").replace("```", "")
+        output = json5.loads(output_raw)
+    except Exception:  # pylint: disable=W0718
+        json_output = json_corrector_chain().run(json=output_raw)
+        json_output = json_output.replace("```json", "").replace("```", "")
+        output = json5.loads(json_output)
+
+    return int(output["left_in_right_score"])

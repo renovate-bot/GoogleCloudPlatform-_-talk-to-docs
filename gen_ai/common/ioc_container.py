@@ -45,8 +45,8 @@ import gen_ai.common.common as common
 from gen_ai.common.embeddings_provider import EmbeddingsProvider
 from gen_ai.common.exponential_retry import LLMExponentialRetryWrapper
 from gen_ai.common.storage import DefaultStorage
-from gen_ai.common.vector_provider import VectorStrategy, VectorStrategyProvider
-
+from gen_ai.common.vector_provider import (VectorStrategy,
+                                           VectorStrategyProvider)
 
 LLM_YAML_FILE = "gen_ai/llm.yaml"
 
@@ -133,9 +133,7 @@ def provide_vector_indices(regenerate: bool = False) -> Chroma:
 
     vector_strategy_provider = VectorStrategyProvider(vector_name)
     vector_strategy: VectorStrategy = vector_strategy_provider(
-        storage_interface=DefaultStorage(),
-        config=config,
-        vectore_store_path=vectore_store_path
+        storage_interface=DefaultStorage(), config=config, vectore_store_path=vectore_store_path
     )
 
     local_vector_indices = {}
@@ -233,6 +231,26 @@ class Container(containers.DeclarativeContainer):
     )
     similar_questions_chain = providers.Singleton(
         provide_chain, "similar_questions_prompt", ["question", "similar_questions_number"], "similar_questions"
+    )
+
+    enhance_question_chain = providers.Singleton(
+        provide_chain, "enhanced_prompt", ["question", "member_context"], "text"
+    )
+
+    string_matcher_chain = providers.Singleton(
+        provide_chain, "substring_matching_prompt", ["left_string", "right_string"], "text", scoring_llm
+    )
+
+    majority_voting_chain = providers.Singleton(
+        provide_chain, "majority_voting_prompt", ["question", "answers"], "text"
+    )
+
+    golden_answer_scoring_chain = providers.Singleton(
+        provide_chain,
+        "golden_answer_scoring_prompt",
+        ["question", "actual_answer", "expected_answer"],
+        "text",
+        scoring_llm,
     )
 
     previous_conversation_relevancy_chain = providers.Singleton(

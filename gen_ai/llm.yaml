@@ -20,7 +20,7 @@ model_name: gemini-1.5-flash-preview-0514
 scoring_model_name: gemini-1.5-flash-preview-0514
 embeddings_name: vertexai
 embeddings_model_name: textembedding-gecko@003
-vector_name: vais
+vector_name: chroma
 document_retriever: semantic #custom is for custom use case
 vais_datastore_mode: chunk # chunk/extractive
 vais_location: us # us/global
@@ -45,6 +45,177 @@ parallel_main_llm_calls: 5
 is_debug: false
 print_system_metrics: true
 debug_info: false
+
+substring_matching_prompt: |
+  You are a professional string matcher. You receive left string and right string. Your goal is to say how much of the left string is contained in the right string.
+
+  <Examples>
+    <Example1>
+      <left_string>
+        Hello, how are you?
+      </left_string>
+      <right_string>
+        Hello, how are you? I would like to know how is everything going.
+      </right_string>
+      <output>
+        {{
+          "left_in_right_score": 100
+        }}
+      </output>
+    </Example1>
+    <Example2>
+      <left_string>
+        The cat sat on the mat. It also saw the dog.
+      </left_string>
+      <right_string>
+        The cat sat on the mat.
+      </right_string>
+      <output>
+        {{
+          "left_in_right_score": 50
+        }}
+      </output>
+    </Example2>
+
+  </Examples>
+
+
+  <Instructions>
+    - Look at the left string and right string return left_in_right_score. It should be a number between 0 and 100.
+    - Use reasoning and step-by-step thinking.
+    - The output MUST BE A VALID JSON object. This requires the following:
+      - Ensure that the JSON structure includes curly braces at the beginning and end of the object.
+      - Use double quotes for all keys and string values.
+      - Ensure that keys and values are separated by a colon.
+      - Separate multiple key-value pairs with commas.
+      - Avoid trailing commas after the last key-value pair.
+      - Avoid ticks "`"" and triple ticks "```"" in the response.
+      - Special characters in strings should be escaped using backslashes (e.g., use \\" for double quotes within strings).
+      - Response format - all the fields need to be returned as strings. 
+    - Response format JSON - all the fields need to be returned as strings. 
+        {{
+          "left_in_right_score": <Number between 0 and 100 indicating how much of the left string is contained in the right string>
+        }}
+  </Instructions>
+
+  Now it's your turn!
+  <LeftString>{left_string}</LeftString>
+  <RightString>{right_string}</RightString>
+
+golden_answer_scoring_prompt: |
+  You are a professional answer scorer. You receive the expected answer and the actual answer. Your mission is to say how correct is the actual answer.
+  You also receive a question that was asked, it can help you to evaluate similarity between asnwers. Compare the expected answer and the actual answer.
+  <Examples>
+    <Question>
+      My doctor said the code she was billing is 77061; can you confirm that's covered?
+    </Question>
+    <ExpectedAnswer>
+      Yes, this is covered as preventive, because 77061 is a valid CPT code.
+    </ExpectedAnswer>
+    <ActualAnswer>
+      77061 is a valid CPT code for 3D mammography and would be covered as preventive.
+    </ActualAnswer>
+    <Output>
+      <correctness_score>100</correctness_score>
+    </Output>
+  </Examples>
+
+  <Instructions>
+    - Look at the question and answer and return correctness_score for the answer. It should be a number between 0 and 100.
+    - Use reasoning and step-by-step thinking.
+    - The output MUST BE A VALID JSON object. This requires the following:
+      - Ensure that the JSON structure includes curly braces at the beginning and end of the object.
+      - Use double quotes for all keys and string values.
+      - Ensure that keys and values are separated by a colon.
+      - Separate multiple key-value pairs with commas.
+      - Avoid trailing commas after the last key-value pair.
+      - Avoid ticks "`"" and triple ticks "```"" in the response.
+      - Special characters in strings should be escaped using backslashes (e.g., use \\" for double quotes within strings).
+      - Response format - all the fields need to be returned as strings. 
+    - Response format JSON - all the fields need to be returned as strings. 
+        {{
+          "correctness_score": <Number between 0 and 100 indicating how correct is the actual answer>,
+        }}
+  </Instructions>
+
+  Now it's your turn!
+  <Question>{question}</Question>
+  <ExpectedAnswer>{expected_answer}</ExpectedAnswer>
+  <ActualAnswer>{actual_answer}</ActualAnswer>
+
+
+enhanced_prompt: |
+  You are a professional question enhancer. Your goal is to enhance a question with the user information <member_context>. 
+  Use the <member_context> below and append to the users <question> as a a prefix as shown in the examples below:
+  <Examples>
+    <Example1>
+      <member_context>
+        caller_name: Subscriber
+        subject_relationship: Self - Harry Potter
+        subject_age: 58
+        subject_gender: F
+        subject_cob_status: No OI
+      </member_context>
+      <question>
+        My doctor is recommending I start having a 3D mammography for my routine mammogram screenings. Are those covered?
+      </question>
+      <appended_question_with_member_context>
+        {{
+          "appended_question_with_member_context": I would like to know the answer to a question from the following member. The member is a subscriber, 58 years old female without any OI (other insurance coverage). Her doctor is recommending that she start having a 3D mammography for routine mammogram screenings. Are those covered?
+        }}
+      </appended_question_with_member_context>
+    </Example1>
+    <Example2>
+      <member_context>
+        caller_name: Subscriber
+        subject_relationship: Spouse
+        Plan: BoA
+        subject_age: 47
+        subject_gender: M
+        subject_cob_status: No OI
+      </member_context>
+      <question>
+        Is outpatient radiation covered?
+      </question>
+      <appended_question_with_member_context>
+        {{
+          "appended_question_with_member_context": I would like to know the answer to a question from the following member about his spouse. The member is a subscriber, his spouse is a 47 year old male without any OI (other insurance coverage). Is outpatient radiation covered?
+        }}
+      </appended_question_with_member_context>
+    </Example2>
+    <Example3>
+      <member_context>
+        caller_name: Subscriber
+        subject_relationship: CH
+        Plan: BoA
+        subject_age: 8
+        subject_gender: F
+        subject_cob_status: No OI
+      </member_context>
+      <question>
+        My child was hit with a baseball and knocked out a permanent tooth. Will my insurance cover a replacement tooth?
+      </question>
+      <appended_question_with_member_context>
+        {{
+          "appended_question_with_member_context": I would like to know the answer to a question from the following member about his child. The member is a subscriber, and the child is an 8 year old female without any OI (other insurance coverage). Her child was hit with a baseball and knocked out a permanent tooth. Will the insurance cover a replacement tooth?
+        }}
+      </appended_question_with_member_context>
+    </Example3>
+  </Examples>
+
+  <Instructions>
+     - Return JSON in the following format:
+       Response format - all the fields need to be returned as strings. 
+        {{
+          "appended_question_with_member_context": <appended question with member context>
+        }}
+    - Avoid using First Name and Last Name of the person
+  </Instructions>
+
+  Now it's your turn!
+  <MemberContext>{member_context}</MemberContext>
+  <Question>{question}</Question>
+
 
 previous_conversation_scoring_prompt: |
   You are an expert relevance evaluator tasked with determining how relevant a previous conversation is to a specific question. Your evaluation must be provided in a JSON format. Detailed guidelines for the JSON response format and evaluation criteria are outlined below.
