@@ -267,6 +267,7 @@ Execute commands in each module.
 - `customer_name` - the company name used in the Agent Builder Search Engine.
 - `vais_data_store` - the Agent Builder Data Store ID.
 - `vais_engine_id` - the Agent Builder Search Engine ID.
+- `vais_location` - the location for discoveryengine API (Agent Builder) resources, one of us, eu, or global
 
 ## 2. Configure optional [input variable](https://developer.hashicorp.com/terraform/language/values/variables#assigning-values-to-root-module-variablesvalues) values in `terraform/main/vars.auto.tfvars`.
 - `global_lb_domain` - the domain name you want to use for the Cloud Load Balancer front end. You need control of the DNS zone to [edit the A record](#add-an-a-record-to-the-dns-managed-zone). If left unset, Terraform will default to using [nip.io](https://nip.io) with the load balancer IP address.
