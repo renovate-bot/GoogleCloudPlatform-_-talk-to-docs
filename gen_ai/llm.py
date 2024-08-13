@@ -36,7 +36,6 @@ from langchain.chains import LLMChain
 from gen_ai.common.argo_logger import create_log_snapshot
 from gen_ai.common.bq_utils import load_data_to_bq
 from gen_ai.common.common import merge_outputs, remove_duplicates
-from gen_ai.common.document_utils import generate_contexts_from_docs
 from gen_ai.common.exponential_retry import concurrent_best_reduce
 from gen_ai.common.ioc_container import Container
 from gen_ai.common.memorystore_utils import serialize_previous_conversation
@@ -49,6 +48,7 @@ from gen_ai.custom_client_functions import fill_query_state_with_doc_attributes
 from gen_ai.deploy.model import (Conversation, PersonalizedData, QueryState,
                                  transform_to_dictionary)
 from gen_ai.common.exponential_retry import concurrent_best_reduce
+from gen_ai.custom_client_functions import default_generate_contexts_from_docs
 from gen_ai.deploy.model import Conversation, PersonalizedData, QueryState, transform_to_dictionary
 
 
@@ -238,7 +238,7 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
         post_filtered_docs = prev_post_filtered_docs + post_filtered_docs
 
     post_filtered_docs = remove_duplicates(post_filtered_docs)
-    contexts = generate_contexts_from_docs(post_filtered_docs, query_state)
+    contexts = default_generate_contexts_from_docs(post_filtered_docs, query_state)
 
     final_round_statement = ""
     max_rounds = config.get("max_rounds", 3)
