@@ -17,20 +17,22 @@ Functions:
 Exceptions:
     None
 """
+import glob
 import uuid
 from timeit import default_timer
 from typing import Literal
+
 import click
 import llm
+import numpy as np
 import pandas as pd
-
-from gen_ai.common.ioc_container import Container
 
 from gen_ai.check_recall import (
     prepare_recall_calculation,
     prepare_scoring_calculation,
     prepare_semantic_score_calculation,
 )
+from gen_ai.common.ioc_container import Container
 
 
 def get_input_df(csv_path: str) -> pd.DataFrame:
@@ -200,6 +202,38 @@ def run_pipeline(
             print(f"Total flow took {end - start} seconds")
         else:
             raise ValueError("Not implemented mode")
+    if mode == "batch" and is_gt and n_calls > 1:
+        merge_csv_files(output_path)
+
+
+def merge_csv_files(the_path: str) -> None:
+    """Merges all csv files of launch into one merged df file.
+
+    Args:
+        the_path (str): The path to the folder containing all csv files from run.
+
+    """
+
+    csv_files = glob.glob(the_path + "*.csv")
+
+    fields = [
+        "response",
+        "time_taken_total",
+        "confidence_score",
+        "golden_score",
+        "original_question",
+        "question_x",
+        "post_filtered_documents_so_far_content",
+        "post_filtered_documents_so_far",
+    ]
+    dfs = [pd.read_csv(x)[fields] for x in csv_files]
+    merged_df = dfs[0]
+    for i in range(1, len(dfs)):
+        df1 = dfs[i]
+        merged_df = merged_df.merge(df1, on="original_question", suffixes=("", f"_df{i}"))
+    merged_df = merged_df[sorted(merged_df.columns)]
+    merged_df.to_csv(f"{the_path}/merged_df.csv", index=None)
+    Container.logger().info(msg=f"Merged file saved into folder: {the_path}")
 
 
 @click.command()
