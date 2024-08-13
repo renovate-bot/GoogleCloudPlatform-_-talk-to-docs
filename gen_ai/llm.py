@@ -9,7 +9,6 @@ and log conversation states and interactions to BigQuery for further analysis. I
 to manage dependencies and settings, facilitating a flexible and decoupled design.
 
 Functions:
-    generate_contexts_from_docs(docs_and_scores, query_state): Generates text contexts from document data.
     get_total_count(question, selected_context, previous_rounds, final_round_statement): Calculates the total 
     token count.
     generate_response_react(conversation): Handles the generation of responses in a reactive conversation cycle.
@@ -43,8 +42,7 @@ from gen_ai.common.react_utils import filter_non_relevant_previous_conversations
 from gen_ai.common.retriever import perform_retrieve_round, retrieve_initial_documents
 from gen_ai.common.statefullness import resolve_and_enrich, serialize_response
 from gen_ai.common.exponential_retry import concurrent_best_reduce
-from gen_ai.common.document_utils import generate_contexts_from_docs
-from gen_ai.custom_client_functions import fill_query_state_with_doc_attributes
+from gen_ai.custom_client_functions import fill_query_state_with_doc_attributes, generate_contexts_from_docs
 from gen_ai.deploy.model import Conversation, PersonalizedData, QueryState, transform_to_dictionary
 
 
@@ -140,6 +138,7 @@ def perform_main_llm_call(
 
     attempts = 2
     done = False
+    output = {}
     while not done:
         try:
             if attempts <= 0:
