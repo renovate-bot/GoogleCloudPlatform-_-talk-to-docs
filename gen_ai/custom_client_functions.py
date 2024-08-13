@@ -298,7 +298,9 @@ def default_build_doc_title(metadata: dict[str, str]) -> str:
     return doc_title
 
 
-def custom_generate_contexts_from_docs(docs_and_scores: list[Document], query_state: QueryState | None = None) -> list[str]:
+def custom_generate_contexts_from_docs(
+        docs_and_scores: list[Document], query_state: QueryState | None = None
+) -> list[str]:
     kc_docs = [x for x in docs_and_scores if x.metadata["data_source"] == "kc"]
     b360_docs = [x for x in docs_and_scores if x.metadata["data_source"] == "b360"]
     kc_context = default_generate_contexts_from_docs(kc_docs, query_state)[0]
@@ -318,7 +320,9 @@ def custom_generate_contexts_from_docs(docs_and_scores: list[Document], query_st
 
 @inject
 @trace_on("Generating context from documents", measure_time=True)
-def default_generate_contexts_from_docs(docs_and_scores: list[Document], query_state: QueryState | None = None) -> list[str]:
+def default_generate_contexts_from_docs(
+    docs_and_scores: list[Document], query_state: QueryState | None = None
+) -> list[str]:
     """
     Generates textual contexts from a list of documents, preparing them for input to a language model.
 
