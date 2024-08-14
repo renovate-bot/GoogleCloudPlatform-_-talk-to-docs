@@ -29,8 +29,8 @@ Terraform modules to stage and deploy the application components. The `bootstrap
 
 ### REFERENCE INFO
 - [Rollbacks](#rollbacks)
-    - [Option 1: Switch Cloud Run service traffic to a previous revision](#option-1-switch-cloud-run-service-traffic-to-a-previous-revision)
-    - [Option 2: Rollback to a previous Docker image using Terraform](#option-2-rollback-to-a-previous-docker-image-using-terraform)
+    - [Option 1: Use the Cloud Console to switch Cloud Run service traffic to a different revision](#option-1-use-the-cloud-console-to-switch-cloud-run-service-traffic-to-a-different-revision)
+    - [Option 2: Rollback to a different Docker image using Terraform](#option-2-rollback-to-a-different-docker-image-using-terraform)
 - [[OPTIONAL] Prepare the Discovery Engine Data Store 'manually' using HTTP](#optional-prepare-the-discovery-engine-data-store-manually-using-http)
     - [Create metadata](#1-create-metadata)
     - [Purge documents](#2a-optional-purge-documents)

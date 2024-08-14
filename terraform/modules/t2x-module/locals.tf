@@ -46,6 +46,7 @@ locals {
         { name = "relevance_score", type = "STRING", mode = "REQUIRED" },
         { name = "additional_question", type = "STRING", mode = "NULLABLE" },
         { name = "plan_and_summaries", type = "STRING", mode = "REQUIRED" },
+        { name = "original_question", type = "STRING", mode = "NULLABLE" },
       ]
     },
     "experiment" = {
