@@ -177,7 +177,7 @@ roles=(
 )
 
 for role in "${roles[@]}"; do
-  gcloud projects add-iam-policy-binding $PROJECT --member="serviceAccount:terraform-service-account@${PROJECT}.iam.gserviceaccount.com" --role=$role
+  gcloud projects add-iam-policy-binding $PROJECT --member="serviceAccount:terraform-service-account@${PROJECT}.iam.gserviceaccount.com" --role=$role --condition=None
 done
 
 ```
@@ -307,13 +307,14 @@ gcloud builds submit . --config=cloudbuild.yaml --project=$PROJECT --region=$REG
 
 - Verify the TLS certificate is active and the endpoint is reachable using `curl`.
 - *It may take some more time after the certificate reaches ACTIVE Managed status before the endpoint responds with success. It may throw an SSLError due to mismatched client and server protocols until changes propagate.*
-- [Authenticate](https://cloud.google.com/run/docs/authenticating/service-to-service) with the `terraform-service-account` and the [Cloud Run custom audience](https://cloud.google.com/run/docs/configuring/custom-audiences) to generate an ID token.
+- [Authenticate](https://cloud.google.com/run/docs/authenticating/service-to-service) using a service account and the [Cloud Run custom audience](https://cloud.google.com/run/docs/configuring/custom-audiences) to generate an ID token.
+- The service account must have the `roles/run.invoker` role on the Cloud Run service.
 - The server responds with a 200 status code and `{"status":"ok"}` if the endpoint is reachable and the TLS certificate is active.
 - [OPTIONAL] Consider skipping to the [Stage document extractions](#stage-document-extractions) step first then return here to test the endpoint while waiting for DNS propagation.
 ```sh
-export PROJECT='my-project-id' # replace with your project ID
-export AUDIENCE='https://34.54.24.62.nip.io/t2x-api' # replace with the Cloud Run Custom Audience (uses load balancer domain or nip.io domain plus the Cloud Run service name as the '/path') - will be displayed in Terraform outputs as 'custom_audience'.
-export TOKEN=$(gcloud auth print-identity-token --impersonate-service-account="terraform-service-account@${PROJECT}.iam.gserviceaccount.com" --audiences=$AUDIENCE)
+export AUDIENCE='https://34.54.24.62.nip.io/t2x-api' # replace with the Cloud Run Custom Audience (uses load balancer domain or nip.io domain plus the Cloud Run service name as the '/path') - will be displayed in Terraform main module outputs as 'custom_audience'.
+export RUN_INVOKER_SERVICE_ACCOUNT='run-invoker-service-account@my-project-id.iam.gserviceaccount.com' # replace with the run invoker service account email address
+export TOKEN=$(gcloud auth print-identity-token --impersonate-service-account=$RUN_INVOKER_SERVICE_ACCOUNT --audiences=$AUDIENCE)
 curl -X GET -H "Authorization: Bearer ${TOKEN}" "${AUDIENCE}/health"
 ```
 
@@ -395,8 +396,10 @@ export REGION='us-central1'
 export DATASET_NAME='{source_extractions_folder_path}' # replace with the source extractions folder path
 # i.e. with the full source path URI as 'gs://source-extractions-bucket/extractions20240715' -> 'extractions20240715'
 
-gcloud workflows execute t2x-doc-ingestion-workflow --project=$PROJECT --location=$REGION --data="{\"dataset_name\":\"$DATASET_NAME\"}" --impersonate-service-account=terraform-service-account@${PROJECT}.iam.gserviceaccount.com
-# Impersonation my not be required if your user account has the required permission to execute the workflow.
+# [OPTIONAL] Use impersonation if your user account does not have the required permission to execute the workflow.
+export WORKFLOW_INVOKER_SERVICE_ACCOUNT="my-service-account@${PROJECT}.iam.gserviceaccount.com" # use any service account with permission to invoke and get workflow executions (https://cloud.google.com/workflows/docs/access-control#roles) that you can impersonate (requires the caller to have the roles/iam.serviceAccountTokenCreator role on the service account)
+
+gcloud workflows execute t2x-doc-ingestion-workflow --project=$PROJECT --location=$REGION --data="{\"dataset_name\":\"$DATASET_NAME\"}" --impersonate-service-account=$WORKFLOW_INVOKER_SERVICE_ACCOUNT
 ```
 - Check the progress in the console or by issuing the `gcloud` command returned by `gcloud workflows execute`.
 - [OPTIONAL] To wait for the workflow to complete and return results from your terminal, issue this command after executing the workflow.
@@ -520,19 +523,19 @@ tf apply
     - `collection` - the Data Store collection name. Leave as `default_collection`.
     - `company_name` - the company name used in the Agent Builder Search Engine.
     - `data_store_id` - the Data Store ID. **Must match the `vais_data_store` value in `llm.yaml`**.
-    - `dataset_name` - the dataset name of the document extractions. i.e., `extractions20240715`. Same as the $EXTRACTION_PATH value set in the [Stage document extractions](#7-stage-document-extractions) step.
+    - `dataset_name` - the dataset name of the document extractions. i.e., `extractions20240715`. Same as the $DATASET_NAME value set in the [Stage document extractions](#stage-document-extractions) step.
     - `engine_id` - the Search Engine ID. **Must match the `vais_engine_id` value in `llm.yaml`**.
     - `location` - the discoveryengine API location. **Must match the `vais_location` value in `llm.yaml`**. One of `us`, `eu`, or `global`.
     - `metadata_filename` - the metadata file name. Leave as `metadata.jsonl`.
     - `metadata_folder` - the name of the staging bucket folder to receive the metadata JSONL file. Leave as `data-store-metadata`.
-    - `source_folder` - the name of the staging bucket folder containing document extraction files. Will be `source-data` after completing the steps in [Stage document extractions](#7-stage-document-extractions).
+    - `source_folder` - the name of the staging bucket folder containing document extraction files. Will be `source-data` after completing the steps in [Stage document extractions](#stage-document-extractions).
 
 ```sh
 export PROJECT='my-project-id' # replace with your project ID
 export AUDIENCE='https://demoapp.example.com/t2x-api' # replace with the Cloud Run Custom Audience (uses load balancer domain or nip.io domain plus the Cloud Run service name)
-# [OPTIONAL] Get the custom audience from the Terraform output -> export AUDIENCE=$(tf output -raw custom_audiences[0])
-export SERVICE_ACCOUNT="terraform-service-account@${PROJECT}.iam.gserviceaccount.com"
-export TOKEN=$(gcloud auth print-identity-token --impersonate-service-account=$SERVICE_ACCOUNT  --audiences=$AUDIENCE)
+# [OPTIONAL] Get the custom audience from the Terraform main module output -> export AUDIENCE=$(tf output -raw custom_audiences[0])
+export RUN_INVOKER_SERVICE_ACCOUNT="run-invoker-service-account@${PROJECT}.iam.gserviceaccount.com" # use any service account with the roles/run.invoker role on the t2x-api Cloud Run service that you can impersonate (requires the caller to have the roles/iam.serviceAccountTokenCreator role on the service account)
+export TOKEN=$(gcloud auth print-identity-token --impersonate-service-account=$RUN_INVOKER_SERVICE_ACCOUNT  --audiences=$AUDIENCE)
 
 # Edit the values in data.json - below is an example only
 cat << EOF > data.json
@@ -669,8 +672,9 @@ gcloud storage buckets create gs://my-terraform-bucket --project=my-project --un
 ```terraform
 terraform {
   backend "gcs" {
-    bucket = "my-terraform-bucket"
-    prefix = "terraform_state/"
+    bucket                      = "my-terraform-bucket"
+    impersonate_service_account = "terraform-service-account@my-project-id..iam.gserviceaccount.com"
+    prefix                      = "terraform_state/"
   }
   required_providers {
     google = {
