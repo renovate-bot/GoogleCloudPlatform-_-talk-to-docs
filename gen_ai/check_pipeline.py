@@ -166,6 +166,7 @@ def run_pipeline(
         if mode == "batch":
             df = get_input_df(csv_path)
             df = df.sort_values(by=["Multi-turn or Single-turn", "Scenario/Question #"])
+            member_id = None
             for i, row in df.iterrows():
                 if row["Multi-turn or Single-turn"] == "Single-turn":
                     print("SINGLE-TUUUUUUUUUURN")
