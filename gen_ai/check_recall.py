@@ -232,10 +232,10 @@ def get_semantic_score(expected_text: str, retrieved_actual_text: list) -> float
     if str(expected_text) == "nan":
         return 100.0
 
-    retrieved_actual_text = "\n".join([x[0] for x in retrieved_actual_text])
-
     if not expected_text or not retrieved_actual_text:
         return 0.0
+
+    retrieved_actual_text = "\n".join([x[0] for x in retrieved_actual_text])
 
     # Calculate the fuzzy similarity score
     score = substring_matching(expected_text, retrieved_actual_text)
