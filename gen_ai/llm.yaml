@@ -22,9 +22,9 @@ embeddings_name: vertexai
 embeddings_model_name: textembedding-gecko@003
 vector_name: vais
 document_retriever: semantic #custom is for custom use case
-vais_engine_id: engine_id # should be set if want to use existing vais_engine
-vais_data_store: vais_data_store # should be set if if want to use existing vais_data_store
-vais_data_store_mode: chunk # chunk/extractive
+vais_staging_bucket: null # should be set if want to use existing bucket
+vais_data_store: null # replace with data store ID to be created in Terraform and used by T2X
+vais_engine_id: null # replace with search engine ID to be created in Terraform and used by T2X
 vais_location: us # us/global
 use_prev_and_next_pieces: 1 # integer between 0 and 3
 api_mode: stateless

@@ -706,8 +706,9 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         if not os.path.exists(self.vectore_store_path):
             print("No VAIS vector store found, creating one...")
             dataset_name = self.config.get("dataset_name")
+            vais_staging_bucket = self.config.get("vais_staging_bucket", None)
 
-            waize_gcs_uri = self.__prepare_waize_format(processed_files_dir, dataset_name)
+            waize_gcs_uri = self.__prepare_waize_format(processed_files_dir, dataset_name, vais_staging_bucket)
             waize_data_store = self.__create_waize_data_store(project_id, dataset_name, self.location)
             waize_data_store = self.__import_data_to_waize_data_store(
                 project_id, waize_data_store, waize_gcs_uri, self.location
@@ -755,14 +756,16 @@ class VertexAISearchVectorStrategy(VectorStrategy):
         print(f"Saved VAIS urls to {vais_path}")
         print(f"VAIS urls are: \n {vais_urls}")
 
-    def __prepare_waize_format(self, processed_dir, dataset_name):
+    def __prepare_waize_format(self, processed_dir, dataset_name, bucket_name=None):
         """Prepares data for VAIS import.
 
         Creates a JSONL file from processed files and uploads it to a new GCS bucket.
+        If `bucket_name` is provided, files are read from that bucket instead of `processed_dir`.
 
         Args:
-            processed_dir (str): The directory containing processed files.
+            processed_dir (str): The directory containing processed files (used if `bucket_name` is None).
             dataset_name (str): The name to use for the dataset.
+            bucket_name (str, optional): The name of the GCS bucket to read files from.
 
         Returns:
             str: The name of the new GCS bucket.
@@ -777,26 +780,46 @@ class VertexAISearchVectorStrategy(VectorStrategy):
 
         print(f"Copying the Documents and JSONL file to bucket: {new_bucket_name}")
         jsonl_data = []
-        all_files = list(os.listdir(processed_dir))
+
+        if bucket_name:
+            source_bucket = storage_client.bucket(bucket_name)
+            blobs = source_bucket.list_blobs()
+            all_files = [blob.name for blob in blobs]
+        else:
+            all_files = list(os.listdir(processed_dir))
+
         for i, filename in tqdm.tqdm(enumerate(all_files), total=len(all_files)):
             if filename.endswith("_metadata.json"):
                 file_name_base = filename[:-14]  # Remove "_metadata.json"
-                txt_file_path = os.path.join(processed_dir, f"{file_name_base}.txt")
-                if not os.path.isfile(txt_file_path):
-                    continue  # Skip if no matching TXT file
+                txt_file_name = f"{file_name_base}.txt"
 
-                metadata_path = os.path.join(processed_dir, filename)
-                with open(metadata_path, "r", encoding="utf-8") as metadata_file:
-                    metadata = json.load(metadata_file)
-                metadata_str = json.dumps(metadata)
+                if bucket_name:
+                    # Download files from the source bucket
+                    metadata_blob = source_bucket.blob(filename)
+                    metadata_str = metadata_blob.download_as_string().decode("utf-8")
+                    metadata = json.loads(metadata_str)
 
-                txt_blob = new_bucket.blob(f"data/{file_name_base}.txt")
-                txt_blob.upload_from_filename(txt_file_path)
+                    txt_blob = source_bucket.blob(f"data/{txt_file_name}")
+                    new_blob_name = f"data/{txt_file_name}" 
+                    source_bucket.copy_blob(txt_blob, new_bucket, new_blob_name)                 
+                else:
+                    # Read files from the local directory
+                    txt_file_path = os.path.join(processed_dir, txt_file_name)
+                    if not os.path.isfile(txt_file_path):
+                        continue  # Skip if no matching TXT file
+
+                    metadata_path = os.path.join(processed_dir, filename)
+                    with open(metadata_path, "r", encoding="utf-8") as metadata_file:
+                        metadata = json.load(metadata_file)
+                    metadata_str = json.dumps(metadata)
+
+                    txt_blob = new_bucket.blob(f"data/{txt_file_name}")
+                    txt_blob.upload_from_filename(txt_file_path)
 
                 jsonl_entry = {
                     "id": str(i),
                     "jsonData": metadata_str,
-                    "content": {"mimeType": "text/plain", "uri": f"gs://{new_bucket_name}/data/{file_name_base}.txt"},
+                    "content": {"mimeType": "text/plain", "uri": f"gs://{new_bucket_name}/data/{txt_file_name}"},
                 }
                 jsonl_data.append(jsonl_entry)
 
