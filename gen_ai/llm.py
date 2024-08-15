@@ -158,7 +158,7 @@ def perform_main_llm_call(
         len(post_filtered_docs) == 0 and not output.get("additional_information_to_retrieve", None)
     ):
         return default_error_response
-    
+
     if Container.config.get("separate_confidence_score", True):
         confidence = get_confidence_score(question, output["answer"])
     else:

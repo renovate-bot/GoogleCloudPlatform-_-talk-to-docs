@@ -155,7 +155,7 @@ def concurrent_best_reduce(num_calls):
                             results.append(result)
                     except TimeoutError:
                         print("A function call exceeded the timeout and was skipped.")
-                    except Exception as e:
+                    except Exception as e: # pylint: disable=W0718
                         print(f"A function call failed due to an error: {e}")
 
             if not results:
@@ -190,7 +190,7 @@ def timeout_llm_call(timeout):
     Returns:
         A decorator function that can be applied to other functions to enforce the timeout.
     """
-    
+
     def decorator_timeout(func: Callable[..., tuple[Any, float]]) -> Callable[..., tuple[Any, float]]:
         """
         Inner decorator function that applies the timeout to the wrapped function.
