@@ -36,13 +36,13 @@ from langchain.chains import LLMChain
 from gen_ai.common.argo_logger import create_log_snapshot
 from gen_ai.common.bq_utils import load_data_to_bq
 from gen_ai.common.common import merge_outputs, remove_duplicates
+from gen_ai.common.exponential_retry import concurrent_best_reduce
 from gen_ai.common.ioc_container import Container
 from gen_ai.common.memorystore_utils import serialize_previous_conversation
 from gen_ai.common.react_utils import filter_non_relevant_previous_conversations, get_confidence_score
 from gen_ai.common.retriever import perform_retrieve_round, retrieve_initial_documents
 from gen_ai.common.statefullness import resolve_and_enrich, serialize_response
-from gen_ai.common.exponential_retry import concurrent_best_reduce
-from gen_ai.custom_client_functions import fill_query_state_with_doc_attributes, generate_contexts_from_docs
+from gen_ai.custom_client_functions import generate_contexts_from_docs, fill_query_state_with_doc_attributes
 from gen_ai.deploy.model import Conversation, PersonalizedData, QueryState, transform_to_dictionary
 
 
@@ -319,16 +319,6 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
         if confidence >= 5:
             break
 
-    # if confidence != 5:
-    #     max_confidence_score = max([x["confidence_score"] for x in log_snapshots])
-    #     most_confident_round = [x for x in log_snapshots if x['confidence_score'] == max_confidence_score][0]
-    #     most_conf_ix = log_snapshots.index(most_confident_round)
-    #     actual_ix = log_snapshots.index(react_snapshot)
-    #     log_snapshots[most_conf_ix], log_snapshots[actual_ix] = log_snapshots[actual_ix], log_snapshots[most_conf_ix]
-    #     output['answer'] = most_confident_round['answer']
-    #     output['confidence_score'] = most_confident_round['confidence_score']
-    #     output['context_used'] = most_confident_round['context_used']
-
     conversation.round_numder = round_number
     query_state.answer = output["answer"]
     query_state.relevant_context = output["context_used"]
@@ -405,6 +395,12 @@ def respond_api(question: str, member_context_full: PersonalizedData | dict[str,
     if isinstance(member_context_full, PersonalizedData):
         member_context_full = transform_to_dictionary(member_context_full)
     query_state = QueryState(question=question, all_sections_needed=[])
+    query_state.original_question = (
+        Container.original_question
+        if (hasattr(Container, "original_question") and Container.original_question is not None)
+        else None
+    )
     conversation = Conversation(exchanges=[query_state])
     conversation = respond(conversation, member_context_full)
     return conversation
+
