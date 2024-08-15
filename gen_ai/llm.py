@@ -98,7 +98,6 @@ def perform_main_llm_call(
     previous_rounds: list[dict],
     round_number: int,
     final_round_statement: str,
-    json_corrector_chain: Any,
     post_filtered_docs: list,
 ) -> tuple[dict[str, Any], float]:
     """Performs a main LLM (Large Language Model) call to generate an answer to a question.
@@ -114,7 +113,6 @@ def perform_main_llm_call(
         previous_rounds: History of previous question-answer rounds.
         round_number: The current round number.
         final_round_statement: A statement for the final round, if applicable.
-        json_corrector_chain: An LLM chain for correcting JSON output if needed.
         post_filtered_docs: List of documents filtered post-retrieval (may be empty).
 
     Returns:
@@ -194,7 +192,6 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
         Exception: If there is any issue in the processing steps, including document retrieval,
         context generation, or response handling.
     """
-    json_corrector_chain: LLMChain = Container.json_corrector_chain
     react_chain: LLMChain = Container.react_chain
     vector_indices: dict = Container.vector_indices
     config: dict = Container.config
@@ -274,7 +271,6 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
                 previous_rounds,
                 round_number,
                 final_round_statement,
-                json_corrector_chain,
                 post_filtered_docs,
             )
             round_outputs.append((output, confidence))
