@@ -19,7 +19,7 @@ def enhance_question(question: str, enhanced_string: str) -> str:
         question=question,
         member_context=enhanced_string,
     )
-    enhanced_question = eval(enhanced_question)
+    enhanced_question = eval(enhanced_question)  # pylint: disable=eval-used
     enhanced_question = enhanced_question["appended_question_with_member_context"]
     return enhanced_question
 

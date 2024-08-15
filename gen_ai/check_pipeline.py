@@ -18,12 +18,12 @@ Exceptions:
     None
 """
 import glob
+import os
 import uuid
 from timeit import default_timer
 from typing import Literal
 
 import click
-import numpy as np
 import pandas as pd
 
 from gen_ai.check_recall import (
@@ -195,22 +195,17 @@ def run_pipeline(
             if is_gt:
                 Container.logger().info(msg="Computing GT Scores")
                 scores_df = compute_gt_scores(session_id, df)
-                import os
 
                 if not os.path.exists(output_path):
                     os.makedirs(output_path)
                 scores_df.to_csv(f"{output_path}/{session_id}_run.csv", index=None)
         elif mode == "step":
             start = default_timer()
-            question = "I would like to know the answer to a question from the following member. The member is a subscriber, 59 years old female without any OI (other insurance coverage). The member is traveling to Europe on vacation. Do they have coverage if they need to seek medical treatment?"
-            # question = "I would like to know the answer to a question from the following member. The member is a subscriber, 54 years old female without any OI (other insurance coverage). Can her partner be covered under her plan?"
-            # question = "My doctor said he'd be billing using G0105. Is that a valid code?"
-            question = "I would like to know the answer to a question from the following member. The member is a subscriber, 59 years old female without any OI (other insurance coverage). Their doctor said he'd be billing using G0105. Is that a valid code?"
-            question = "I would like to know the answer to a question from the following member. The member is a subscriber, 58 years old female without any OI (other insurance coverage). Does her insurance cover post-mastectomy items like bras?"
-            question = "I would like to know the answer to a question from the following member. The member is a subscriber, 57 years old female without any OI (other insurance coverage). The member got laid off, is she eligible for COBRA?"
-            question = "I would like to know the answer to a question from the following member. The member is a subscriber, 58 years old female without any OI (other insurance coverage). Now that she has lost her employment, will her dependents be covered under COBRA?"
-            question = "I would like to know the answer to a question from the following member. The member is a subscriber, a 59 year old female without any OI (other insurance coverage). She was just diagnosed with ESRD and is now eligible for Medicare. Which is her primary plan?"
-            # question = 'Find providers in a 85216 ZIP code for a allara healthcare provider'
+            question = (
+                "I would like to know the answer to a question from the following member. The member is a subscriber, "
+                "a 59 year old female without any OI (other insurance coverage). She was just diagnosed with ESRD "
+                "and is now eligible for Medicare. Which is her primary plan?"
+            )
             acis = "001acis"
             for idx, input_query in enumerate([question]):
                 Container.original_question = question
@@ -266,7 +261,7 @@ def merge_csv_files(the_path: str) -> None:
 @click.option("--is_gt", is_flag=True, help="Trigger the computation of ground truth scores.")
 @click.option("--n_calls", default=1, help="Number of times to run the pipeline.")
 @click.argument("output_path", required=False)
-def run_cli(mode, csv_path=None, comments=None, is_gt=False, n_calls=1, output_path="."):
+def run_cli(mode="step", csv_path=None, comments=None, is_gt=False, n_calls=1, output_path="."):
     run_pipeline(mode, csv_path, comments, is_gt, n_calls, output_path)
 
 
