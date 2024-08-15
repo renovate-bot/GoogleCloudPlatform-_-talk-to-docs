@@ -23,7 +23,6 @@ from timeit import default_timer
 from typing import Literal
 
 import click
-import llm
 import numpy as np
 import pandas as pd
 
@@ -32,7 +31,9 @@ from gen_ai.check_recall import (
     prepare_scoring_calculation,
     prepare_semantic_score_calculation,
 )
+from gen_ai.common.eval_utils import enhance_question
 from gen_ai.common.ioc_container import Container
+from gen_ai.llm import respond_api
 
 
 def get_input_df(csv_path: str) -> pd.DataFrame:
@@ -64,7 +65,7 @@ def run_single_prediction(question: str, member_context_full: dict | None = None
         The specific error message is printed.
     """
     try:
-        conversation = llm.respond_api(question, member_context_full)
+        conversation = respond_api(question, member_context_full)
         return conversation.exchanges[-1].answer
     except Exception as e:  # pylint: disable=W0718
         Container.logger().info(msg=e)
@@ -91,13 +92,35 @@ def get_default_personalized_info(row: dict) -> dict | None:
 
 
 def prepend_question_with_member_info(row: dict, question: str) -> str:
+    """Prepends member information to the question if available.
+
+    Args:
+        row (dict): A dictionary containing information from a row, potentially including member context.
+        question (str): The original question string.
+
+    Returns:
+        str: The question string, potentially prepended with member information from the row if "Context" key exists.
+    """
     if "Context" not in row:
         Container.logger().info(msg="There is no Member Info In the GT Doc. Asking simple question")
         return question
-    return llm.enhance_question(question, row["Context"])
+    return enhance_question(question, row["Context"])
 
 
-def compute_gt_scores(session_id: str, df: pd.DataFrame):
+def compute_gt_scores(session_id: str, df: pd.DataFrame) -> pd.DataFrame:
+    """Computes Ground Truth scores for the given session and DataFrame.
+
+    This function calculates various Ground Truth scores, including recall, scoring, and semantic scores,
+    for a given session based on the provided DataFrame. It leverages helper functions to perform
+    specific score calculations and returns a DataFrame enriched with these scores.
+
+    Args:
+        session_id (str): The unique identifier for the session.
+        df (pd.DataFrame): The input DataFrame containing data for which GT scores need to be computed.
+
+    Returns:
+        pd.DataFrame: The DataFrame with computed Ground Truth scores appended.
+    """
     df_joined = prepare_recall_calculation(session_id, df, True)
     df_joined = prepare_scoring_calculation(df_joined)
     df_joined = prepare_semantic_score_calculation(df_joined)

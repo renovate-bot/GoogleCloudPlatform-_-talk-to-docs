@@ -45,8 +45,7 @@ import gen_ai.common.common as common
 from gen_ai.common.embeddings_provider import EmbeddingsProvider
 from gen_ai.common.exponential_retry import LLMExponentialRetryWrapper
 from gen_ai.common.storage import DefaultStorage
-from gen_ai.common.vector_provider import (VectorStrategy,
-                                           VectorStrategyProvider)
+from gen_ai.common.vector_provider import VectorStrategy, VectorStrategyProvider
 
 LLM_YAML_FILE = "gen_ai/llm.yaml"
 
@@ -239,10 +238,6 @@ class Container(containers.DeclarativeContainer):
 
     string_matcher_chain = providers.Singleton(
         provide_chain, "substring_matching_prompt", ["left_string", "right_string"], "text", scoring_llm
-    )
-
-    majority_voting_chain = providers.Singleton(
-        provide_chain, "majority_voting_prompt", ["question", "answers"], "text"
     )
 
     golden_answer_scoring_chain = providers.Singleton(
