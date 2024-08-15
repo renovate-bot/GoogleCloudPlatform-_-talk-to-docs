@@ -3,10 +3,31 @@ This module defines the FastAPI endpoints for the Gen AI project, handling
 requests related to question answering, feedback, and conversational state resets.
 """
 
-from fastapi import FastAPI
+import os
+import posixpath
+import requests
 
-from gen_ai.deploy.model import ItemInput, LLMOutput, ResetInput, ResetOutput, ResponseInput, ResponseOutput
+from fastapi import FastAPI
+import google.auth
+
+from gen_ai.common.de_tools import (
+    create_metadata_jsonl,
+    create_layout_search_datastore,
+    create_search_engine,
+    import_datastore_documents,
+    list_datastore_documents,
+    get_operation_status,
+    purge_datastore_documents,
+    flush_redis_cache,
+)
+from gen_ai.common.ioc_container import Container
+from gen_ai.deploy.model import ItemInput, LLMOutput, ResetInput, ResetOutput, ResponseInput, ResponseOutput, VAISConfig
 from gen_ai.llm import respond_api
+
+
+# Get ADC creds and project ID.
+_, PROJECT = google.auth.default()
+Container.logger().info(f"ADC Project ID: {PROJECT}")
 
 app = FastAPI()
 
@@ -93,6 +114,141 @@ def reset(query: ResetInput) -> ResponseOutput:
 
 
 @app.get("/health")
-def health_check():
+def health_check() -> dict:
     """Provides a health pulse for Cloud Deployment"""
     return {"status": "ok"}
+
+
+# Discovery engine and redis routes.
+@app.post("/create-metadata")
+def create_metadata(request: VAISConfig) -> dict:
+    """Create a metadata JSONL file in a GCS bucket."""
+    return create_metadata_jsonl(
+        project=PROJECT,
+        bucket_name=request.bucket_name,
+        source_folder=request.source_folder,
+        metadata_folder=request.metadata_folder,
+        dataset_name=request.dataset_name,
+        metadata_filename=request.metadata_filename,
+    )
+
+
+@app.post("/create-layout-datastore")
+def create_layout_datastore(request: VAISConfig) -> dict:
+    """Create a data store using the layout parser."""
+    return create_layout_search_datastore(
+        project=PROJECT,
+        location=request.location,
+        collection=request.collection,
+        data_store_id=request.data_store_id,
+    )
+
+
+@app.post("/create-search-engine")
+def create_engine(request: VAISConfig) -> dict:
+    """Create a search engine."""
+    return create_search_engine(
+        project=PROJECT,
+        location=request.location,
+        collection=request.collection,
+        engine_id=request.engine_id,
+        data_store_id=request.data_store_id,
+        company_name=request.company_name,
+    )
+
+
+@app.post("/import-documents")
+def import_docs(request: VAISConfig) -> dict:
+    """Import documents to the data store."""
+    # Compose the path and URI of the metadata JSONL file.
+    metadata_path = posixpath.join(
+        request.bucket_name,
+        request.metadata_folder,
+        request.dataset_name,
+        request.metadata_filename,
+    )
+    metadata_uri = f"gs://{metadata_path}"
+
+    return import_datastore_documents(
+        project=PROJECT,
+        location=request.location,
+        data_store=request.data_store_id,
+        branch=request.branch,
+        metadata_uri=metadata_uri,
+    )
+
+
+@app.get("/get-operation")
+def operation_status(location: str, operation_name: str) -> dict:
+    """Check the status of an Operation."""
+    return get_operation_status(
+        location=location,
+        operation_name=operation_name,
+    )
+
+
+@app.post("/purge-documents")
+def purge_docs(request: VAISConfig) -> dict:
+    """Purge data store documents."""
+    return purge_datastore_documents(
+        project=PROJECT,
+        location=request.location,
+        data_store=request.data_store_id,
+        branch=request.branch,
+        force=True,
+    )
+
+
+@app.get("/list-documents")
+def list_docs(location: str, data_store_id: str, branch: str) -> dict:
+    """List documents in the data store."""
+    return list_datastore_documents(
+        project=PROJECT,
+        location=location,
+        data_store=data_store_id,
+        branch=branch,
+    )
+
+
+@app.get("/count-documents")
+def count_docs(location: str, data_store_id: str, branch: str) -> dict:
+    """Return only the document count in the data store."""
+    list_response = list_datastore_documents(
+        project=PROJECT,
+        location=location,
+        data_store=data_store_id,
+        branch=branch,
+    )
+    return {"total_documents": list_response["total_documents"]}
+
+
+@app.post("/flush-redis")
+def flush_redis() -> dict:
+    """Flush the redis cache."""
+    return flush_redis_cache()
+
+
+@app.get("/get-env-variable")
+def get_env_variables(name: str) -> dict:
+    """Return the value of an environment variable.
+    Ref: https://cloud.google.com/run/docs/testing/local#cloud-code-emulator_1
+    """
+    return {name: os.environ.get(name, f"No variable set for '{name}'")}
+
+
+@app.get("/get-instance-id")
+def get_instance_id() -> dict:
+    """Return the Cloud Run instance ID."""
+    response = requests.get(
+        url="http://metadata.google.internal/computeMetadata/v1/instance/id",
+        headers={"Metadata-Flavor": "Google"},
+    )
+
+    if response.status_code == 200:
+        instance_id = response.text
+        return {"instance_id": instance_id}
+    else:
+        return (
+            "Failed to retrieve instance id",
+            404,
+        )
