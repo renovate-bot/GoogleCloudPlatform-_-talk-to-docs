@@ -15,7 +15,6 @@ vector_store_path: gen_ai/vector_store
 users_file: /mnt/resources/users.json
 logs_directory: gen_ai/logs
 gradio_root_path: /t2x-mig-ui
-vais_engine_id: engine_id # should be set if vector_name is vais
 # Technical configuration
 model_name: gemini-1.5-flash-preview-0514
 scoring_model_name: gemini-1.5-flash-preview-0514
@@ -23,6 +22,11 @@ embeddings_name: vertexai
 embeddings_model_name: textembedding-gecko@003
 vector_name: vais
 document_retriever: semantic #custom is for custom use case
+vais_staging_bucket: null # should be set if want to use existing bucket
+vais_data_store: null # replace with data store ID to be created in Terraform and used by T2X
+vais_engine_id: null # replace with search engine ID to be created in Terraform and used by T2X
+vais_location: us # us/global
+use_prev_and_next_pieces: 1 # integer between 0 and 3
 api_mode: stateless
 personalization: true
 temperature: 0.5
