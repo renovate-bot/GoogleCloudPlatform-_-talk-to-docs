@@ -145,20 +145,34 @@ def concurrent_best_reduce(num_calls):
             Returns:
                 Tuple[Any, float]: The best result from the concurrent executions (result, score).
             """
-            results: list[tuple[Any, float]] = []
+            results: list[tuple[Any, float, bool]] = []
             with ThreadPoolExecutor(max_workers=num_calls) as executor:
                 futures = [executor.submit(func, *args, **kwargs) for _ in range(num_calls)]
                 for future in as_completed(futures):
                     try:
-                        results.append(future.result())
+                        result = future.result()
+                        if result[2]:
+                            results.append(result)
+                    except TimeoutError:
+                        print("A function call exceeded the timeout and was skipped.")
                     except Exception as e:
                         print(f"A function call failed due to an error: {e}")
-            
+
             if not results:
-                raise ValueError("No function calls completed successfully within the allowed time or they all failed.")
+                print(f"All {num_calls} attempted calls were unsuccessful")
+                return (
+                    {
+                        "answer": "I was not able to answer this question",
+                        "plan_and_summaries": "",
+                        "context_used": "[]",
+                        "additional_information_to_retrieve": "",
+                    },
+                    0,
+                    False
+                )
 
             print(f"Selecting the best result from {len(results)} successful calls out of {num_calls} attempted...")
-            best_result: tuple[Any, float] = max(results, key=lambda x: x[1])
+            best_result: tuple[Any, float, bool] = max(results, key=lambda x: x[1])
             return best_result
 
         return wrapper
@@ -207,7 +221,8 @@ def timeout_llm_call(timeout):
                 output["answer"] = "I was not able to answer this question"
                 output["plan_and_summaries"] = ""
                 output["context_used"] = "[]"
-                return output, 0
+                output["additional_information_to_retrieve"] = ""
+                return output, 0, False
 
         return wrapper_timeout
 

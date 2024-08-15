@@ -145,7 +145,8 @@ def perform_main_llm_call(
             "context_used": "[]",
             "additional_information_to_retrieve": "",
         },
-        0
+        0,
+        False
     )
     try:
         output_raw = output_raw.replace("`json", "").replace("`", "")
@@ -171,7 +172,7 @@ def perform_main_llm_call(
             print(f"{confidence}")
             confidence = 0
 
-    return output, confidence  # return output and confidence
+    return output, confidence, True  # return output and confidence
 
 
 @inject
@@ -267,7 +268,7 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
 
         round_outputs = []
         for selected_context in contexts:
-            output, confidence = perform_main_llm_call(
+            output, confidence, _ = perform_main_llm_call(
                 react_chain,
                 question,
                 previous_context,
