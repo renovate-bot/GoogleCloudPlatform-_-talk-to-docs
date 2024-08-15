@@ -138,43 +138,27 @@ def perform_main_llm_call(
 
     llm_end_time = default_timer()
     Container.logger().info(f"Generating main LLM answer took {llm_end_time - llm_start_time} seconds")
-
-    attempts = 2
-    done = False
-    while not done:
-        try:
-            if attempts <= 0:
-                break
-            output_raw = output_raw.replace("`json", "").replace("`", "")
-            output = json5.loads(output_raw)
-            done = True
-        except Exception as e:  # pylint: disable=W0718
-            Container.logger().info(msg=f"Crashed before correct chain, attempts: {attempts}")
-            Container.logger().info(msg=str(e))
-            if not Container.config.get("separate_confidence_score", True):
-                output["answer"] = "I was not able to answer this question"
-                output["plan_and_summaries"] = ""
-                output["context_used"] = "[]"
-                output["additional_information_to_retrieve"] = ""
-                return output, 0
-            json_output = json_corrector_chain().run(json=output_raw)
-            json_output = json_output.replace("`json", "").replace("`", "")
-            try:
-                output = json5.loads(json_output)
-                done = True
-            except Exception as e2:  # pylint: disable=W0718
-                Container.logger().info(msg=f"Crashed before correct chain, attempts: {attempts}")
-                Container.logger().info(msg=str(e2))
-                done = False
-                attempts -= 1
+    default_error_response = (
+        {
+            "answer": "I was not able to answer this question",
+            "plan_and_summaries": "",
+            "context_used": "[]",
+            "additional_information_to_retrieve": "",
+        },
+        0
+    )
+    try:
+        output_raw = output_raw.replace("`json", "").replace("`", "")
+        output = json5.loads(output_raw)
+    except Exception as e:  # pylint: disable=W0718
+        Container.logger().info(msg="Crashed before correct chain")
+        Container.logger().info(msg=str(e))
+        return default_error_response
 
     if "answer" not in output or (
         len(post_filtered_docs) == 0 and not output.get("additional_information_to_retrieve", None)
     ):
-        output["answer"] = "I was not able to answer this question"
-        output["plan_and_summaries"] = ""
-        output["context_used"] = ""
-        return output, 0
+        return default_error_response
     
     if Container.config.get("separate_confidence_score", True):
         confidence = get_confidence_score(question, output["answer"])
