@@ -18,8 +18,7 @@ from langchain_community.vectorstores.chroma import Chroma
 from langchain_core.documents.base import Document
 
 import gen_ai.common.common as common
-from gen_ai.common.chroma_utils import (convert_to_chroma_format,
-                                        convert_to_vais_format)
+from gen_ai.common.chroma_utils import convert_to_chroma_format, convert_to_vais_format
 from gen_ai.common.ioc_container import Container
 from gen_ai.common.measure_utils import trace_on
 
@@ -130,3 +129,4 @@ class SemanticDocumentRetriever(DocumentRetriever):
         self, store: Chroma, questions_for_search: str, metadata: dict[str, str] | None = None
     ) -> list[Document]:
         return self._get_related_docs_from_store(store, questions_for_search, metadata)
+

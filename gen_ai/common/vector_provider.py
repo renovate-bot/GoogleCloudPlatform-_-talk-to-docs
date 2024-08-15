@@ -93,13 +93,27 @@ class VectorStore(ABC):
 class VectorStrategy(ABC):
     """Abstract base class for defining vector embedding and index creation strategies.
 
+    This class provides a blueprint for managing the process of generating vector
+    embeddings for documents and creating vector indices for efficient similarity
+    search. Concrete subclasses are responsible for implementing the specific logic
+    for different vector storage and retrieval systems (e.g., Chroma, Vertex AI).
+
     Attributes:
-        storage_interface: An interface for interacting with storage systems.
-        config: Configuration for the vector strategy.
+        storage_interface: An interface for interacting with storage systems
+            to retrieve documents for indexing.
+        config: A dictionary containing configuration parameters for the
+            vector strategy.
     """
 
     def __init__(self, storage_interface: Storage, config: dict[str, str]):
-        """Initializes VectorStrategy with storage interface and configuration."""
+        """Initializes VectorStrategy with storage interface and configuration.
+
+        Args:
+            storage_interface: An instance of a class implementing the Storage
+                interface, providing methods to access and retrieve documents.
+            config: A dictionary holding configuration settings for the vector strategy.
+                The specific keys and values depend on the concrete subclass implementation.
+        """
         self.storage_interface = storage_interface
         self.config = config
 
@@ -109,14 +123,26 @@ class VectorStrategy(ABC):
     ) -> dict[str, str]:
         """Retrieves or creates vector indices based on the provided configuration.
 
+        This method is responsible for either retrieving existing vector indices
+        or creating new ones based on the provided configuration and data.
+
         Args:
-            regenerate: If True, forces index regeneration.
-            embeddings: The embedding model to use for generating vector representations.
-            vector_indices: Existing vector indices (if any).
-            processed_files_dir: directory where files are stored
+            regenerate: If True, forces the regeneration of vector indices,
+                even if they already exist. If False, existing indices will be loaded
+                if available.
+            embeddings: An instance of an embedding model that will be used to
+                generate vector representations of documents during index creation.
+            vector_indices: A dictionary representing existing vector indices,
+                where keys are plan names and values are the corresponding index objects.
+                This parameter can be an empty dictionary if no indices exist.
+            processed_files_dir: The directory path where processed files
+                (e.g., text documents) are stored. These files will be used
+                as input for generating vector embeddings and creating the index.
 
         Returns:
             A dictionary mapping plan names to their corresponding vector indices.
+            The structure of the index objects depends on the specific vector store
+            implementation (e.g., Chroma, Vertex AI).
         """
         raise NotImplementedError("Cannot be invoked directly from abstract class")
 
@@ -129,7 +155,10 @@ class ChromaVectorStore(VectorStore):
     """
 
     def __init__(self, chroma: Chroma):
-        """Initializes ChromaVectorStore with a Chroma instance."""
+        """Initializes ChromaVectorStore with a Chroma instance.
+        Args:
+            chroma: An instance of a ChromaDB class from Langchain.
+        """
         self.chroma = chroma
 
     def similarity_search(self, query: str, k: int = 4, **kwargs) -> list[Document]:
@@ -176,7 +205,14 @@ class VertexVectorStore(VectorStore):
     def __init__(
         self, vertex: aiplatform.MatchingEngineIndexEndpoint, index_id: str, embeddings: Embeddings, doc_mapping: dict
     ):
-        """Initializes VertexVectorStore with endpoint, index ID, embeddings, and document mapping."""
+        """Initializes VertexVectorStore with endpoint, index ID, embeddings, and document mapping.
+
+        Args:
+            vertex: Vertex AI endpoint instance.
+            index_id: The ID of the Vertex AI index.
+            embeddings: The embedding model used for generating vectors.
+            doc_mapping: Mapping between document IDs and their textual content/metadata.
+        """
         self.vertex = vertex
         self.index_id = index_id
         self.embeddings = embeddings
@@ -258,18 +294,16 @@ class VertexAISearchVectorStore(VectorStore):
     Args:
         project_id: Your Google Cloud Project ID.
         engine_id: The ID of your Vertex AI Search engine.
-        data_store_id: The ID of your date store.
         config: Configuration for the vector store.
 
     Attributes:
         project_id: The Google Cloud Project ID.
         location: The location of the Vertex AI Search engine.
         engine_id: The ID of the Vertex AI Search engine.
-        data_store_id: The ID of the date store.
         config: Configuration for the vector store.
         use_prev_and_next_pieces: Whether to include previous and next pieces of text.
         location: The location of the Vertex AI Search resources.
-        vais_datastore_mode: The mode of the Vertex AI Search data store.
+        vais_data_store_mode: The mode of the Vertex AI Search data store.
 
     Methods:
         _search_sample: Internal method to perform a search using Vertex AI Search.
@@ -278,15 +312,20 @@ class VertexAISearchVectorStore(VectorStore):
         max_marginal_relevance_search: Currently not implemented.
     """
 
-    def __init__(self, project_id: str, engine_id: str, data_store_id: str, config: dict):
-        """Initializes VertexAISearchVectorStore with project, engine, and data store IDs."""
+    def __init__(self, project_id: str, engine_id: str, config: dict):
+        """Initializes VertexAISearchVectorStore with project, engine, and data store IDs.
+
+        Args:
+            project_id: Your Google Cloud Project ID.
+            engine_id: The ID of your Vertex AI Search engine.
+            config: Configuration for the vector store.
+        """
         self.project_id = project_id
         self.engine_id = engine_id
-        self.data_store_id = data_store_id
         self.config = config
         self.use_prev_and_next_pieces = self.config.get("use_prev_and_next_pieces", 0)
         self.location = self.config.get("vais_location", "global")
-        self.vais_datastore_mode = self.config.get("vais_datastore_mode", "extractive")
+        self.vais_data_store_mode = self.config.get("vais_data_store_mode", "extractive")
 
     @retry_with_exponential_backoff()
     def perform_search_request(
@@ -345,7 +384,7 @@ class VertexAISearchVectorStore(VectorStore):
             f"collections/default_collection/engines/{engine_id}/"
             "servingConfigs/default_config"
         )
-        if self.vais_datastore_mode == "extractive":
+        if self.vais_data_store_mode == "extractive":
             content_search_spec = discoveryengine.SearchRequest.ContentSearchSpec(
                 extractive_content_spec=discoveryengine.SearchRequest.ContentSearchSpec.ExtractiveContentSpec(
                     max_extractive_segment_count=1,
@@ -354,7 +393,7 @@ class VertexAISearchVectorStore(VectorStore):
                     num_next_segments=self.use_prev_and_next_pieces,
                 ),
             )
-        elif self.vais_datastore_mode == "chunk":
+        elif self.vais_data_store_mode == "chunk":
             content_search_spec = discoveryengine.SearchRequest.ContentSearchSpec(
                 chunk_spec=discoveryengine.SearchRequest.ContentSearchSpec.ChunkSpec(
                     num_previous_chunks=self.use_prev_and_next_pieces,
@@ -381,9 +420,9 @@ class VertexAISearchVectorStore(VectorStore):
 
         response = self.perform_search_request(client, request)
         ls = response.results
-        if self.vais_datastore_mode == "extractive":
+        if self.vais_data_store_mode == "extractive":
             docs = self.get_extractive_segments(ls)
-        elif self.vais_datastore_mode == "chunk":
+        elif self.vais_data_store_mode == "chunk":
             docs = self.get_chunks(ls)
         else:
             raise ValueError("Not correct mode for vais is passed, should be chunk/extractive")
@@ -620,6 +659,13 @@ class VertexAISearchVectorStrategy(VectorStrategy):
     """
 
     def __init__(self, storage_interface: Storage, config: dict[str, str], vectore_store_path: str) -> None:
+        """Initializes VertexAISearchVectorStrategy with storage, config, and store path.
+
+        Args:
+            storage_interface: The LlamaIndex storage interface for data persistence.
+            config: Configuration dictionary containing VAIS settings.
+            vectore_store_path: The base directory to store VAIS configuration.
+        """
         super().__init__(storage_interface, config)
         self.vectore_store_path = f"{vectore_store_path}_vais"
         self.config = config
@@ -674,7 +720,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             print("VAIS vector store exists, retrieving the values...")
         waize_engine_id, waize_data_store = self.__deserialize_engine_id()
 
-        return VertexAISearchVectorStore(project_id, waize_engine_id, waize_data_store, self.config)
+        return VertexAISearchVectorStore(project_id, waize_engine_id, self.config)
 
     def __deserialize_engine_id(self):
         """Deserializes the VAIS engine ID from a JSON file.
@@ -793,7 +839,7 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             f"locations/{location}/collections/default_collection/dataStores"
             f"?dataStoreId={new_data_store}"
         )
-        if self.config.get("vais_datastore_mode", "extractive") == "extractive":
+        if self.config.get("vais_data_store_mode", "extractive") == "extractive":
             data = {
                 "displayName": f"{new_data_store_name}",
                 "industryVertical": "GENERIC",
@@ -891,9 +937,9 @@ class VertexAISearchVectorStrategy(VectorStrategy):
             if self.__import_finished(project_id, data_store_id, location):
                 return data_store_id
             else:
+                print(f"Documents Import Job is in progress, rechecking again in {delay_factor} seconds...")
                 time.sleep(delay_factor)
                 delay_factor = min(delay_factor**2, 300)
-                print(f"Documents Import Job is in progress, rechecking again in {delay_factor} seconds...")
 
     def __app_exists(self, project_id, app_id, location) -> bool:
         client_options = (
