@@ -2,8 +2,7 @@
 Vertex AI Embeddings or OpenAIEmbeddings"""
 
 from langchain.schema.embeddings import Embeddings
-from langchain_openai import OpenAIEmbeddings
-from langchain_google_vertexai import VertexAIEmbeddings
+from langchain.embeddings import VertexAIEmbeddings, OpenAIEmbeddings
 
 
 class EmbeddingsProvider:

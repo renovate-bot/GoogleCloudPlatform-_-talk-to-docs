@@ -10,9 +10,9 @@ from typing import List, Tuple
 
 import tiktoken
 import yaml
-from langchain_openai import ChatOpenAI
+from langchain.chat_models import ChatOpenAI, ChatVertexAI
 from langchain.chat_models.base import BaseChatModel
-from langchain_google_vertexai import ChatVertexAI, VertexAI
+from langchain.llms import VertexAI
 from langchain.schema import Document
 
 from gen_ai.deploy.model import QueryState
