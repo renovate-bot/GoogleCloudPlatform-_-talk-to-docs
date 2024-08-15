@@ -800,8 +800,8 @@ class VertexAISearchVectorStrategy(VectorStrategy):
                     metadata = json.loads(metadata_str)
 
                     txt_blob = source_bucket.blob(f"data/{txt_file_name}")
-                    new_blob_name = f"data/{txt_file_name}" 
-                    source_bucket.copy_blob(txt_blob, new_bucket, new_blob_name)                 
+                    new_blob_name = f"data/{txt_file_name}"
+                    source_bucket.copy_blob(txt_blob, new_bucket, new_blob_name)
                 else:
                     # Read files from the local directory
                     txt_file_path = os.path.join(processed_dir, txt_file_name)
