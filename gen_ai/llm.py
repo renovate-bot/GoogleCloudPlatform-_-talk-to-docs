@@ -321,10 +321,6 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
 
     conversation.round_numder = round_number
     query_state.answer = output["answer"]
-    if isinstance(output["context_used"], str):
-        query_state.relevant_context = literal_eval(output["context_used"])
-    if isinstance(output["context_used"], list):
-        query_state.relevant_context = output["context_used"]
     query_state.relevant_context = output["context_used"]
     query_state.all_sections_needed = [x[0] for x in query_state.used_articles_with_scores]
     query_state.used_articles_with_scores = None

@@ -1,8 +1,8 @@
 # This file defines the LLM prompts and configuration parameters used
 # to converse with a user.
 # Project and User specific configuration
-bq_project_id: null # leave null to use ADC and write BQ logs to the deployment project - change to customize BQ location to another project
-dataset_name: dataset_name # change for new project
+bq_project_id: chertushkin-genai-sa # leave null to use ADC and write BQ logs to the deployment project - change to customize BQ location to another project
+dataset_name: uhg # change for new project
 gcs_source_bucket: gs://bucket location # change for new project
 terraform_instance_name: talk-to-docs-instance
 terraform_redis_name: talk-to-docs-redis-instance
@@ -370,7 +370,8 @@ retriever_scoring_prompt: |
   <Question>{question}</Question>
 
 answer_scoring_prompt: |
-  You are a professional answer scorer. You receive the question and the answer. Your mission is to say how helpful is the answer to the question.
+  You are a professional answer scorer. You receive the question and the answer. 
+  Your mission is to say how confident you are the answer to the question is correct.
   <Examples>
     <Question>
       My doctor is recommending I start having a 3D mammography for my routine mammogram screengings. Are those covered?
@@ -379,14 +380,14 @@ answer_scoring_prompt: |
       Preventive 3D Mammography is covered. When received INN, there is no charge and no deductible applies; prior authorization is not required to receive this care.
     </Answer>
     <Output>
-      <helpfullness_score>5</helpfullness_score>
-      <answer_helpfullness_resoning>The question asks about coverage details for 3D mammograms. The answer is helpful and complete.</answer_helpfullness_resoning>
+      <confidence_score>100</confidence_score>
+      <answer_confidence_resoning>The question asks about coverage details for 3D mammograms. The answer is helpful, complete and factual. Therefore I am confident it is correct.</answer_confidence_resoning>
     </Output>
   </Examples>
 
   <Instructions>
-    - Look at the question and answer and return helpfullness_score for the answer. It should be a number between 1 and 5.
-    - Use reasoning and step-by-step thinking, provide a answer_helpfullness_resoning to justify your response.
+    - Look at the question and answer and return confidence_score for the answer. It should be a number between 0 and 100.
+    - Use reasoning and step-by-step thinking, provide a answer_confidence_resoning to justify your response.
     - The output MUST BE A VALID JSON object. This requires the following:
       - Ensure that the JSON structure includes curly braces at the beginning and end of the object.
       - Use double quotes for all keys and string values.
@@ -398,8 +399,8 @@ answer_scoring_prompt: |
       - Response format - all the fields need to be returned as strings. 
     - Response format - all the fields need to be returned as strings. 
         {{
-          "helpfullness_score": <Number between 1 and 5 indicating how helpful is the answer>,
-          "answer_helpfullness_resoning": <A short summary on what information is missing to make the answer to the question completely helpful>,
+          "confidence_score": <Number between 0 and 100 indicating how confident you are in the answer correctness>,
+          "answer_confidence_resoning": <A short summary on what information is missing to make the answer to the question completely correct>,
         }}
   </Instructions>
 
@@ -491,9 +492,7 @@ simple_react_chain_prompt: |
 
 
   </Instructions>
-  Here is the context: {context}
 
-  Here is the question: {question}
   You need to provide the response in JSON format:
   {{
     "plan_and_summaries": "Here provide plan of answer and reasoning about it",
@@ -501,6 +500,22 @@ simple_react_chain_prompt: |
     "additional_information_to_retrieve": "Here provide follow-up question",
     "context_used": "Here just fill empty string"
   }}
+
+  Now it's your turn!
+  <Question>
+    {question}
+  </Question>
+  <Previous Conversation>
+    {previous_conversation}
+  </Previous Conversation>
+  <Previous Rounds>
+    {previous_rounds}
+  </Previous Rounds>
+  This marks the start of text from b360 documents. Remember that these are the member specific documents that will override kc documents, in case of a conflict re: coverage of a service.
+  <Context>
+    {context}
+  </Context>
+
 
 react_chain_prompt: |
   You are a smart, friendly and helpful chatbot for United Healthcare. 
