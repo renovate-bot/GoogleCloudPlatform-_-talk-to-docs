@@ -1,3 +1,12 @@
+"""Module for interacting with Vertex AI Search (Discovery Engine).
+
+This module provides functions for:
+- Creating and managing Datastores.
+- Creating and managing Search Engines.
+- Importing and purging documents.
+- Monitoring operation status.
+- Interacting with Redis cache.
+"""
 from concurrent.futures import as_completed, Future, ThreadPoolExecutor
 import json
 import posixpath
@@ -30,7 +39,7 @@ def sanitize(text: str) -> str:
 
 
 def process_blob(
-    id: int,
+    blob_id: int,
     blob: storage.Blob,
     bucket: storage.Bucket,
 ) -> dict[str, Any] | None:
@@ -44,7 +53,7 @@ def process_blob(
     Returns:
         dict | None: The metadata JSONL data or None if the blob is not a metadata file.
     """
-    Container.logger().debug(f"Processing {id}: {blob.name}...")
+    Container.logger().debug(f"Processing {blob_id}: {blob.name}...")
 
     # Process only JSON metadata files.
     if blob.name.endswith("_metadata.json"):
@@ -63,11 +72,11 @@ def process_blob(
             metadata = json.load(metadata_file)
         metadata_str = json.dumps(metadata)
 
-        Container.logger().debug(f"Read {id}: {blob.name} successfully.")
+        Container.logger().debug(f"Read {blob_id}: {blob.name} successfully.")
 
         # Return metadata to add to the JSONL data.
         jsonl_data = {
-            "id": str(id),
+            "id": str(blob_id),
             "jsonData": metadata_str,
             "content": {
                 "mimeType": "text/plain",
@@ -82,7 +91,7 @@ def process_blob(
     return None
 
 
-def process_result(results: list, result: Any, *args: tuple[int, storage.Blob]) -> None:
+def process_result_func(results: list, result: Any, *args: tuple[int, storage.Blob]) -> None:
     """Process the result of a task function.
 
     Args:
@@ -97,10 +106,10 @@ def process_result(results: list, result: Any, *args: tuple[int, storage.Blob]) 
     Container.logger().debug(f"Processing result: {result}")
 
     # Unpack the input args for traceability and append results to the collection list.
-    id, blob = args
+    blob_id, blob = args
     if result:
         results.append(result)
-        Container.logger().debug(f"Processed {id}: {blob.name} successfully.")
+        Container.logger().debug(f"Processed {blob_id}: {blob.name} successfully.")
 
     return
 
@@ -110,7 +119,7 @@ def multithread_exec(
     iterable: Iterable,
     max_workers: int = 10,
     args: tuple = (),
-    kwargs: dict = {},
+    kwargs: dict | None = None,
     description: str = "Processing",
     process_result: Callable = None,
 ) -> list:
@@ -129,13 +138,14 @@ def multithread_exec(
         list: A list of results from the task function.
     """
     Container.logger().info(f"Starting the thread pool executor with {max_workers} workers...")
-
+    if kwargs is None:
+        kwargs = {}
     # Execute the task function with a ThreadPoolExecutor.
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {executor.submit(task, *items, *args, **kwargs): items for items in iterable}
 
         # Create a progress bar for the futures.
-        futures_progress: tqdm[Future] = tqdm(
+        futures_progress: Iterable[Future] = tqdm(
             as_completed(futures),
             # total=len(futures),
             desc=description,
@@ -157,7 +167,7 @@ def multithread_exec(
                 process_result(result_list, result, *future_inputs)
                 Container.logger().debug(f"Processing result OK: {future_inputs}")
 
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 Container.logger().error(f"Error processing {future_inputs}: {e}")
 
     return result_list
@@ -221,7 +231,7 @@ def create_metadata_jsonl(
         # max_workers=50,
         args=(bucket,),
         description="Processing Metadata Files",
-        process_result=process_result,
+        process_result=process_result_func,
     )
 
     results = {}
@@ -230,7 +240,7 @@ def create_metadata_jsonl(
     Container.logger().info(f"Number of processed metadata files: {results['total_count']}")
 
     # Create the metadata JSONL file in the GCS output folder.
-    Container.logger().info(f"Creating Metadata JSONL file...")
+    Container.logger().info("Creating Metadata JSONL file...")
     jsonl_path = posixpath.join(metadata_folder, dataset_name, metadata_filename)
     metadata_blob = bucket.blob(jsonl_path)
     with metadata_blob.open("w", encoding="utf-8") as outfile:

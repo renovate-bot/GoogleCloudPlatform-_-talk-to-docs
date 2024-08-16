@@ -242,6 +242,7 @@ def get_instance_id() -> dict:
     response = requests.get(
         url="http://metadata.google.internal/computeMetadata/v1/instance/id",
         headers={"Metadata-Flavor": "Google"},
+        timeout=120,
     )
 
     if response.status_code == 200:
