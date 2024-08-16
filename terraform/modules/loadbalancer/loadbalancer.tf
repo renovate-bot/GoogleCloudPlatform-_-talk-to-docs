@@ -72,7 +72,7 @@ resource "google_storage_managed_folder_iam_member" "public_viewer" {
   bucket         = google_storage_managed_folder.folder.bucket
   managed_folder = google_storage_managed_folder.folder.name
   role           = "roles/storage.objectViewer"
-  member         = "allAuthenticatedUsers"
+  member         = "allUsers"
 }
 
 resource "google_storage_bucket_object" "index" {
