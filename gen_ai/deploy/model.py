@@ -96,6 +96,20 @@ class ResetOutput(BaseModel):
     success: bool
 
 
+class VAISConfig(BaseModel):
+    branch: str = "default_branch"
+    bucket_name: str
+    collection: str = "default_collection"
+    company_name: str
+    data_store_id: str
+    dataset_name: str
+    engine_id: str
+    location: str
+    metadata_filename: str
+    metadata_folder: str
+    source_folder: str
+
+
 class LLMOutput(BaseModel):
     """
     A model representing the structured output of a conversational AI response.
