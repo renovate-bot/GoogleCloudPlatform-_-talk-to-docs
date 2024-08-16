@@ -36,13 +36,13 @@ from langchain.chains import LLMChain
 from gen_ai.common.argo_logger import create_log_snapshot
 from gen_ai.common.bq_utils import load_data_to_bq
 from gen_ai.common.common import merge_outputs, remove_duplicates
-from gen_ai.common.exponential_retry import concurrent_best_reduce
+from gen_ai.common.exponential_retry import concurrent_best_reduce, timeout_llm_call
 from gen_ai.common.ioc_container import Container
 from gen_ai.common.memorystore_utils import serialize_previous_conversation
 from gen_ai.common.react_utils import filter_non_relevant_previous_conversations, get_confidence_score
 from gen_ai.common.retriever import perform_retrieve_round, retrieve_initial_documents
 from gen_ai.common.statefullness import resolve_and_enrich, serialize_response
-from gen_ai.custom_client_functions import generate_contexts_from_docs, fill_query_state_with_doc_attributes
+from gen_ai.custom_client_functions import fill_query_state_with_doc_attributes, generate_contexts_from_docs
 from gen_ai.deploy.model import Conversation, PersonalizedData, QueryState, transform_to_dictionary
 
 
@@ -89,6 +89,7 @@ def get_total_count(question: str, selected_context: str, previous_rounds: str, 
 
 
 @concurrent_best_reduce(num_calls=Container.config.get("parallel_main_llm_calls", 1))
+@timeout_llm_call(timeout=Container.config.get("parallel_main_llm_timeout", 20))
 def perform_main_llm_call(
     react_chain: Any,
     question: str,
@@ -97,7 +98,6 @@ def perform_main_llm_call(
     previous_rounds: list[dict],
     round_number: int,
     final_round_statement: str,
-    json_corrector_chain: Any,
     post_filtered_docs: list,
 ) -> tuple[dict[str, Any], float]:
     """Performs a main LLM (Large Language Model) call to generate an answer to a question.
@@ -113,7 +113,6 @@ def perform_main_llm_call(
         previous_rounds: History of previous question-answer rounds.
         round_number: The current round number.
         final_round_statement: A statement for the final round, if applicable.
-        json_corrector_chain: An LLM chain for correcting JSON output if needed.
         post_filtered_docs: List of documents filtered post-retrieval (may be empty).
 
     Returns:
@@ -135,41 +134,41 @@ def perform_main_llm_call(
 
     llm_end_time = default_timer()
     Container.logger().info(f"Generating main LLM answer took {llm_end_time - llm_start_time} seconds")
-
-    attempts = 2
-    done = False
-    output = {}
-    while not done:
-        try:
-            if attempts <= 0:
-                break
-            output_raw = output_raw.replace("`json", "").replace("`", "")
-            output = json5.loads(output_raw)
-            done = True
-        except Exception as e:  # pylint: disable=W0718
-            Container.logger().info(msg=f"Crashed before correct chain, attempts: {attempts}")
-            Container.logger().info(msg=str(e))
-            json_output = json_corrector_chain().run(json=output_raw)
-            json_output = json_output.replace("`json", "").replace("`", "")
-            try:
-                output = json5.loads(json_output)
-                done = True
-            except Exception as e2:  # pylint: disable=W0718
-                Container.logger().info(msg=f"Crashed before correct chain, attempts: {attempts}")
-                Container.logger().info(msg=str(e2))
-                done = False
-                attempts -= 1
+    default_error_response = (
+        {
+            "answer": "I was not able to answer this question",
+            "plan_and_summaries": "",
+            "context_used": "[]",
+            "additional_information_to_retrieve": "",
+        },
+        0,
+        False
+    )
+    try:
+        output_raw = output_raw.replace("`json", "").replace("`", "")
+        output = json5.loads(output_raw)
+    except Exception as e:  # pylint: disable=W0718
+        Container.logger().info(msg="Crashed before correct chain")
+        Container.logger().info(msg=str(e))
+        return default_error_response
 
     if "answer" not in output or (
         len(post_filtered_docs) == 0 and not output.get("additional_information_to_retrieve", None)
     ):
-        output["answer"] = "I was not able to answer this question"
-        output["plan_and_summaries"] = ""
-        output["context_used"] = ""
+        return default_error_response
 
-    confidence = get_confidence_score(question, output["answer"])
+    if Container.config.get("separate_confidence_score", True):
+        confidence = get_confidence_score(question, output["answer"])
+    else:
+        try:
+            confidence = output.get("confidence_score", 0)
+            confidence = int(confidence)
+        except ValueError:
+            print("failed to convert {confidence} to integer")
+            print(f"{confidence}")
+            confidence = 0
 
-    return output, confidence  # return output and confidence
+    return output, confidence, True  # return output and confidence
 
 
 @inject
@@ -193,7 +192,6 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
         Exception: If there is any issue in the processing steps, including document retrieval,
         context generation, or response handling.
     """
-    json_corrector_chain: LLMChain = Container.json_corrector_chain
     react_chain: LLMChain = Container.react_chain
     vector_indices: dict = Container.vector_indices
     config: dict = Container.config
@@ -265,7 +263,7 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
 
         round_outputs = []
         for selected_context in contexts:
-            output, confidence = perform_main_llm_call(
+            output, confidence, _ = perform_main_llm_call(
                 react_chain,
                 question,
                 previous_context,
@@ -273,7 +271,6 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
                 previous_rounds,
                 round_number,
                 final_round_statement,
-                json_corrector_chain,
                 post_filtered_docs,
             )
             round_outputs.append((output, confidence))
