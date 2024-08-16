@@ -28,7 +28,6 @@ Dependencies:
 import uuid
 from timeit import default_timer
 from typing import Any
-from ast import literal_eval
 
 import json5
 from dependency_injector.wiring import inject
