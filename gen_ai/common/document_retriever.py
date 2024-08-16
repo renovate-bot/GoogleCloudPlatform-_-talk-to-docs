@@ -40,6 +40,8 @@ def remove_member_and_session_id(metadata: dict[str, Any]) -> dict[str, Any]:
         del new_metadata["member_id"]
     if "session_id" in new_metadata:
         del new_metadata["session_id"]
+    if "cob_status" in new_metadata:
+        del new_metadata["cob_status"]
     return new_metadata
 
 

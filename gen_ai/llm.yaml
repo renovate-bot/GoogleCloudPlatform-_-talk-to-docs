@@ -1,7 +1,7 @@
 # This file defines the LLM prompts and configuration parameters used
 # to converse with a user.
 # Project and User specific configuration
-bq_project_id: null # leave null to use ADC and write BQ logs to the deployment project - change to customize BQ location to another project
+bq_project_id: chertushkin-genai-sa # leave null to use ADC and write BQ logs to the deployment project - change to customize BQ location to another project
 dataset_name: dataset_name # change for new project
 gcs_source_bucket: gs://bucket location # change for new project
 terraform_instance_name: talk-to-docs-instance

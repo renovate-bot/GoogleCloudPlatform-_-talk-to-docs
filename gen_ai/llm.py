@@ -28,6 +28,7 @@ Dependencies:
 import uuid
 from timeit import default_timer
 from typing import Any
+from ast import literal_eval
 
 import json5
 from dependency_injector.wiring import inject
@@ -126,7 +127,8 @@ def perform_main_llm_call(
         include_run_info=True,
         return_only_outputs=False,
         question=question,
-        context=previous_context + selected_context,
+        previous_conversation=previous_context,
+        context=selected_context,
         previous_rounds=previous_rounds,
         round_number=round_number,
         final_round_statement=final_round_statement,
@@ -288,6 +290,7 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
             "answer": output["answer"],
             "confidence_score": confidence,
             "context_used": output["context_used"],
+            "additional_information_to_retrieve": output["additional_information_to_retrieve"],
         }
         query_state.react_rounds.append(react_snapshot)
         previous_rounds = json5.dumps(query_state.react_rounds, indent=4)
@@ -318,11 +321,17 @@ def generate_response_react(conversation: Conversation) -> tuple[Conversation, l
 
     conversation.round_numder = round_number
     query_state.answer = output["answer"]
+    if isinstance(output["context_used"], str):
+        query_state.relevant_context = literal_eval(output["context_used"])
+    if isinstance(output["context_used"], list):
+        query_state.relevant_context = output["context_used"]
     query_state.relevant_context = output["context_used"]
     query_state.all_sections_needed = [x[0] for x in query_state.used_articles_with_scores]
     query_state.used_articles_with_scores = None
     query_state.confidence_score = confidence
-    query_state = fill_query_state_with_doc_attributes(query_state, post_filtered_docs)
+    query_state, post_filtered_docs = fill_query_state_with_doc_attributes(query_state, post_filtered_docs)
+    for x in log_snapshots:
+        x["post_filtered_docs_so_far"] = post_filtered_docs
 
     return conversation, log_snapshots
 

@@ -208,6 +208,7 @@ class Container(containers.DeclarativeContainer):
 
     _input_variables_react = [
         "question",
+        "previous_conversation",
         "context",
         "previous_rounds",
         "round_number",
