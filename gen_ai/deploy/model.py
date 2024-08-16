@@ -69,6 +69,7 @@ class PersonalizedData(BaseModel):
     set_number: str = ""
     policy_number: str = ""
     session_id: str = ""
+    cob_status: str = ""
 
 
 class ItemInput(BaseModel):

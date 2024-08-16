@@ -28,3 +28,4 @@ python-dotenv==1.0.1
 redis
 tqdm
 uvicorn
+pylint

@@ -4,6 +4,7 @@ This module provides specialized classes and functions tailored for specific use
 cases and include document retrieval, processing, and storage.
 """
 
+import concurrent.futures
 import copy
 import os
 from collections import defaultdict
@@ -23,6 +24,7 @@ from gen_ai.deploy.model import QueryState
 
 def generate_contexts_from_docs(docs_and_scores: list[Document], query_state: QueryState | None = None) -> list[str]:
     return default_generate_contexts_from_docs(docs_and_scores, query_state)
+
 
 def build_doc_title(metadata: dict[str, str]) -> str:
     """Builds a document title using chosen behavior.
@@ -67,13 +69,13 @@ def fill_query_state_with_doc_attributes(query_state: QueryState, post_filtered_
 
 
 def default_fill_query_state_with_doc_attributes(
-        query_state: QueryState, post_filtered_docs: list[Document]
+    query_state: QueryState, post_filtered_docs: list[Document]
 ) -> QueryState:
     """
     Updates the provided query_state object with attributes extracted from documents after filtering.
 
-    This function iterates through each document in the `post_filtered_docs` list.  For each key-value 
-    pair in a document's metadata, it adds the value to the corresponding list in the `custom_fields` 
+    This function iterates through each document in the `post_filtered_docs` list.  For each key-value
+    pair in a document's metadata, it adds the value to the corresponding list in the `custom_fields`
     field of the `query_state`. If the key doesn't exist yet, a new list is created.
 
     Args:
@@ -89,11 +91,11 @@ def default_fill_query_state_with_doc_attributes(
                 query_state.custom_fields[key] = []
             query_state.custom_fields[key].append(value)
 
-    return query_state
+    return query_state, post_filtered_docs
 
 
 def custom_fill_query_state_with_doc_attributes(
-        query_state: QueryState, post_filtered_docs: list[Document]
+    query_state: QueryState, post_filtered_docs: list[Document]
 ) -> QueryState:
     """
     Updates the provided query_state object with attributes extracted from documents after filtering.
@@ -118,6 +120,11 @@ def custom_fill_query_state_with_doc_attributes(
         - attributes_to_kc_mp: A list of dictionaries with attributes from KC MP documents.
 
     """
+    section_names = set(
+        item.lower().strip() for x in query_state.relevant_context for item in (x if isinstance(x, list) else [x])
+    )
+    post_filtered_docs = [x for x in post_filtered_docs if x.metadata["section_name"] in section_names]
+
     query_state.urls = list(set(document.metadata["url"] for document in post_filtered_docs))
 
     # B360 documents
@@ -128,8 +135,10 @@ def custom_fill_query_state_with_doc_attributes(
 
     # KC documents, they can be of two types: from KM (dont have policy number) and from MP (have policy number)
     kc_docs = [x for x in post_filtered_docs if x.metadata["data_source"] == "kc"]
-    kc_km_docs = [x for x in kc_docs if not x.metadata["policy_number"]]
-    kc_mp_docs = [x for x in kc_docs if x.metadata["policy_number"]]
+    # kc_km_docs = [x for x in kc_docs if not x.metadata["policy_number"]]
+    # kc_mp_docs = [x for x in kc_docs if x.metadata["policy_number"]]
+    kc_km_docs = kc_docs
+    kc_mp_docs = []
 
     attributes_to_kc_km = [
         {
@@ -153,7 +162,7 @@ def custom_fill_query_state_with_doc_attributes(
     query_state.custom_fields["attributes_to_kc_km"] = attributes_to_kc_km
     query_state.custom_fields["attributes_to_kc_mp"] = attributes_to_kc_mp
 
-    return query_state
+    return query_state, post_filtered_docs
 
 
 def default_extract_doc_attributes(docs_and_scores: list[Document]) -> list[tuple[str]]:
@@ -163,14 +172,11 @@ def default_extract_doc_attributes(docs_and_scores: list[Document]) -> list[tupl
         docs_and_scores: A list of Document objects, typically returned from a search operation.
 
     Returns:
-        A list of tuples where each tuple contains all metadata attributes from a Document, in an 
-        arbitrary order. The order of the attributes in each tuple may vary depending on the 
+        A list of tuples where each tuple contains all metadata attributes from a Document, in an
+        arbitrary order. The order of the attributes in each tuple may vary depending on the
         underlying dictionary implementation.
     """
-    return [
-        tuple([value for _, value in x.metadata.items()])
-        for x in docs_and_scores
-    ]
+    return [tuple([value for _, value in x.metadata.items()]) for x in docs_and_scores]
 
 
 def custom_extract_doc_attributes(docs_and_scores: list[Document]) -> list[tuple[str]]:
@@ -246,20 +252,32 @@ class CustomSemanticDocumentRetriever(SemanticDocumentRetriever):
         self, store: Chroma, questions_for_search: str, metadata: dict[str, str] | None = None
     ) -> list[Document]:
         # Very custom method
-        if metadata is None or "set_number" not in metadata:
-            custom_metadata = {"data_source": "kc"}
+        if metadata is None or "policy_number" not in metadata:
+            custom_metadata = {"data_source": "kc", "policy_number": "generic"}
             return self._get_related_docs_from_store(store, questions_for_search, custom_metadata)
-        b360_metadata = copy.deepcopy(metadata)
-        b360_metadata["data_source"] = "b360"
+
+        metadatas = []
+        if "set_number" in metadata:
+            b360_metadata = copy.deepcopy(metadata)
+            b360_metadata["data_source"] = "b360"
+            metadatas.append(b360_metadata)
 
         kc_metadata = copy.deepcopy(metadata)
         kc_metadata["data_source"] = "kc"
         if "set_number" in kc_metadata:
             del kc_metadata["set_number"]
-        metadatas = [b360_metadata, kc_metadata]
+        metadatas.append(kc_metadata)
+
         docs = []
-        for metadata in metadatas:
-            docs.extend(self._get_related_docs_from_store(store, questions_for_search, metadata))
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            results = executor.map(
+                lambda m: self._get_related_docs_from_store(store, questions_for_search, m), metadatas
+            )
+
+        docs = []
+        for result in results:
+            docs.extend(result)
 
         return docs
 
@@ -295,11 +313,14 @@ def default_build_doc_title(metadata: dict[str, str]) -> str:
         doc_title += metadata["policy_number"] + " "
     if metadata.get("symbols"):
         doc_title += metadata["symbols"] + " "
+    # add excplicit section name
+    if metadata.get("section_name"):
+        doc_title += "\n" + "DOCUMENT SECTION NAME: " + metadata["section_name"] + " \n"
     return doc_title
 
 
 def custom_generate_contexts_from_docs(
-        docs_and_scores: list[Document], query_state: QueryState | None = None
+    docs_and_scores: list[Document], query_state: QueryState | None = None
 ) -> list[str]:
     kc_docs = [x for x in docs_and_scores if x.metadata["data_source"] == "kc"]
     b360_docs = [x for x in docs_and_scores if x.metadata["data_source"] == "b360"]
@@ -408,5 +429,3 @@ def default_generate_contexts_from_docs(
     doc_attributes = extract_doc_attributes(docs_and_scores)
     Container.logger().info(msg=f"Doc attributes: {doc_attributes}")
     return contexts
-
-
