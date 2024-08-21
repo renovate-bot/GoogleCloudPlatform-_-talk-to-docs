@@ -752,7 +752,8 @@ class JsonExtractor(BaseExtractor):
 
         for (section_id, section_name), context in document_chunks.items():
             filepath = self.create_filepath(metadata, section_name, output_dir)
-
+            if not bool(re.search(r"[a-zA-Z0-9]", context)):
+                continue
             with open(filepath + ".txt", "w", encoding="utf-8") as f:
                 f.write(context)
             temp_metadata = metadata.copy()

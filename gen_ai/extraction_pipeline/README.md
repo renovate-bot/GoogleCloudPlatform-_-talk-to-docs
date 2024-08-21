@@ -13,7 +13,7 @@ There are three parameters you need to pass to run the pipeline:
 - **output** - output directory in local system, GCS bucket path or Datastore ID. Default is `output_data`.
 
 ```sh
-python gen_ai/extraction_pipeline/document_extractor.py <mode> -i <input> -o <output>
+python gen_ai/extraction_pipeline/processor.py <mode> -i <input> -o <output>
 ```
 
 ## Batch mode
