@@ -15,7 +15,9 @@ DOCOCR_PROCESSOR_VERSION = "pretrained-ocr-v2.0-2023-06-02"
 
 
 def extract_pdf_chunk(pdf_reader: PdfReader, start_page: int, end_page: int) -> bytes:
-    """This method takes in a PdfReader object and get the contents of the BytesIO object written from the specified page number range.
+    """
+    This method takes in a PdfReader object and get the contents of the BytesIO object 
+    written from the specified page number range.
 
     Arguments:
         pdf_reader {PyPDF2.PdfReader} -- The PdfReader object to get the chunk from.
@@ -43,12 +45,31 @@ def extract_pdf_chunk(pdf_reader: PdfReader, start_page: int, end_page: int) -> 
     return chunk_pdf_content.getvalue()
 
 
-def list_blocks(blocks: Sequence[documentai.Document.Page.Block], text: str, page_number: int):
-    # print(f"{len(blocks)} blocks detected:")
+def list_blocks(
+        blocks: Sequence[documentai.Document.Page.Block], 
+        text: str, page_number: int
+) -> list[list[list[str, float, int]]]:
+    """
+    Categorizes blocks of text from a page into left and right margin blocks based on their horizontal position.
+
+    Args:
+        blocks: A sequence of Document.Page.Block objects representing blocks of text on a page.
+        text: The full text content of the page.
+        page_number: The page number from which the blocks are extracted.
+
+    Returns:
+        A list containing two lists:
+            - The first list contains information about blocks located within the left margin.
+            - The second list contains information about blocks located outside the left margin.
+
+        Each inner list contains entries representing individual blocks, where each entry is itself a list containing:
+            - The text content of the block.
+            - The minimum normalized y-coordinate of the block's bounding polygon (indicating its vertical position).
+            - The page number from which the block originates.
+    """
     margin = 0.5
     block_list = [[], []]
     for block in blocks:
-        # print(block.layout)
         block_text = layout_to_text(block.layout, text)
         if all(x.x < margin for x in block.layout.bounding_poly.normalized_vertices):
             block_list[0].append(
@@ -75,8 +96,9 @@ def process_document(
     end_page: int,
     process_options: Optional[documentai.ProcessOptions] = None,
 ) -> documentai.Document:
-    """Process a range of pages from a PDF document using Document AI and return the Document object
-        with all its metadata.
+    """
+    Process a range of pages from a PDF document using Document AI and return the Document object
+    with all its metadata.
 
     Arguments:
         pdf_reader {PdfReader} -- A PDF reader object.
@@ -132,9 +154,14 @@ def process_document(
 
 def layout_to_text(layout: documentai.Document.Page.Layout, text: str) -> str:
     """
-    Document AI identifies text in different parts of the document by their
-    offsets in the entirety of the document's text. This function converts
-    offsets to a string.
+    Extracts and concatenates text segments from a Document AI layout into a single string.
+
+    Args:
+        layout (documentai.Document.Page.Layout): The layout object containing information about text segments and their offsets within the document.
+        text (str): The entire text content of the document.
+
+    Returns:
+        str: The concatenated text extracted from the layout, representing the textual content identified within the specified layout.
     """
     response = ""
     # If a text segment spans several lines, it will
@@ -146,10 +173,22 @@ def layout_to_text(layout: documentai.Document.Page.Layout, text: str) -> str:
     return response
 
 
-def extract_text_data(page: documentai.Document.Page, text: str) -> (list[list[str]], list[int]):
-    # Create a dictionary of tables in both cell and row format, using which we can compare
-    # text lines to see whether that line of text belongs to a table, and figure out which table
-    # it belongs to.
+def extract_text_data(page: documentai.Document.Page, text: str) -> tuple[list[list[str]], list[int]]:
+    """
+    Extracts textual data from a Document AI page, separating table data from non-table text lines.
+    The function processes the page's tables, identifies their dimensions, and extracts their content.
+    It then distinguishes text lines that are not part of any table and sorts both tables and text lines based on their vertical position.
+
+
+    Args:
+        page: A Document AI Page object containing the page's layout and content.
+        text: The raw text extracted from the document.
+
+    Returns:
+        A tuple containing:
+            - sorted_tables: A list of sorted tables, each represented as a list of table rows (lists of strings).
+            - sorted_text_lines_only: A list of sorted text lines not belonging to any table, along with their coordinates and original line index.
+    """
     all_table_cells = {}
     all_table_rows = {}
     table_info = []
@@ -199,20 +238,44 @@ def extract_text_data(page: documentai.Document.Page, text: str) -> (list[list[s
                     l,
                 )
             )
-
     sorted_text_lines_only = sorted(text_lines_only, key=lambda x: (50 * x[2] + x[1]))
 
     return sorted_tables, sorted_text_lines_only
 
 
-def is_line_inside_current_text_block(line, td):
+def is_line_inside_current_text_block(line: str, td: list) -> bool:
+    """
+    Determines if a given text line is located within the current text block.
+
+    Args:
+        line: A text line object containing layout information and bounding polygon coordinates.
+        td: A tuple representing the coordinates of the current text block, likely (top, left, bottom, right).
+
+    Returns:
+        bool: True if the line is within the text block, False otherwise.
+    """
+
     return (
         line.layout.bounding_poly.vertices[0].y >= td[1]
         and line.layout.bounding_poly.vertices[0].y <= td[3]
     )
 
 
-def table_coordinates(table):
+def table_coordinates(table: documentai.Document.Page.Table) -> tuple[float, float, float, float]:
+    """
+    Calculates the minimum and maximum x and y coordinates of a table's bounding box.
+
+    Args:
+        table: The table object containing layout information with bounding_poly.
+
+    Returns:
+        A tuple containing four values:
+        - min_x: The minimum x-coordinate of the table's bounding box.
+        - min_y: The minimum y-coordinate of the table's bounding box.
+        - max_x: The maximum x-coordinate of the table's bounding box.
+        - max_y: The maximum y-coordinate of the table's bounding box.
+    """
+
     min_x, min_y = float("inf"), float("inf")
     max_x, max_y = float("-inf"), float("-inf")
     table_x = [table.layout.bounding_poly.vertices[x].x for x in range(4)]
@@ -231,6 +294,19 @@ def process_table_row(
     table_rows: list[str],
     table_row: documentai.Document.Page.Table.TableRow,
 ):
+    """
+    Extracts text from each cell of a table row, appends it to `table_cells`,
+    and constructs a row string which is then appended to `table_rows`.
+
+    Args:
+        text (str): The full text content of the document.
+        table_cells (list[str]): A list to store extracted cell text.
+        table_rows (list[str]): A list to store extracted row text.
+        table_row (documentai.Document.Page.Table.TableRow): A table row object.
+
+    Returns:
+        None: This function modifies `table_cells` and `table_rows` in-place.
+    """
     row_text = ""
     for cell in table_row.cells:
         cell_text = layout_to_text(cell.layout, text)
@@ -239,7 +315,17 @@ def process_table_row(
     table_rows.append(row_text.strip())
 
 
-def convert_table_to_dataframe(table, text):
+def convert_table_to_dataframe(table: documentai.Document.Page.Table, text: str) -> str:
+    """
+    Converts a structured table object (with header and body rows) into a Pandas DataFrame, then to a LaTeX table string.
+
+    Args:
+        table: The table object containing header_rows and body_rows, each row consisting of cells with layouts.
+        text: The associated text from which the table layout was extracted (used in `layout_to_text`).
+
+    Returns:
+        A string representing the table in LaTeX format, ready for inclusion in LaTeX documents.
+    """
     rows = []
 
     for table_row in table.header_rows:
@@ -259,11 +345,10 @@ def convert_table_to_dataframe(table, text):
     return latex_table
 
 
-def process_chunk(chunk_index: int, chunk_size: int, document: documentai.Document) -> list[str]:
-    # For a full list of Document object attributes, please reference this page:
-    # https://cloud.google.com/python/docs/reference/documentai/latest/google.cloud.documentai_v1.types.Document
-    """Read the contents of the document from DocAI's Document object and sort it according to
-        their y-coordinate values to get it line-by-line.
+def process_chunk(document: documentai.Document) -> list[str]:
+    """
+    Read the contents of the document from DocAI's Document object and sort it according to
+    their y-coordinate values to get it line-by-line.
 
     Args:
         chunk_index {int} -- Integer index of the current chunk.
@@ -277,8 +362,6 @@ def process_chunk(chunk_index: int, chunk_size: int, document: documentai.Docume
     try:
         text = document.text
         for page in document.pages:
-            # page_number = page.page_number + chunk_index * chunk_size
-            # page_text = f"Page Number {page_number}:\n"
             page_text = ""
             # Get the text data in the page in the form of a list of text blocks.
             tables, lines = extract_text_data(page, text)
@@ -307,7 +390,20 @@ def process_chunk(chunk_index: int, chunk_size: int, document: documentai.Docume
     return output
 
 
-def process_blocks(chunk_index: int, chunk_size: int, document: documentai.Document):
+def process_blocks(chunk_index: int, chunk_size: int, document: documentai.Document) -> list[list[list[str]]]:
+    """
+    Processes blocks of text within a document and organizes them into tables and paragraphs.
+
+    Args:
+        chunk_index: The index of the current chunk being processed.
+        chunk_size: The number of pages in each chunk.
+        document: A DocumentAI Document object containing the text to be processed.
+
+    Returns:
+        A list containing two lists:
+            - The first list contains extracted tables.
+            - The second list contains extracted paragraphs.
+    """
     output = [[], []]
     try:
         text = document.text
@@ -321,12 +417,23 @@ def process_blocks(chunk_index: int, chunk_size: int, document: documentai.Docum
         # Handle the exception here
         traceback.print_exc()
         print("An error occurred:", str(e))
-    # for x in output:
-    #     print(x)
     return output
 
 
-def transfer_table_to_output(text, output, page, tables, m):
+def transfer_table_to_output(text: str, output: str, page: documentai.Document.Page, tables: list, m: int) -> tuple[int, str]:
+    """
+    Extracts a table from a list of tables, converts it to a DataFrame, appends the DataFrame to an output string, and decrements a counter.
+
+    Args:
+        text (str): The text containing the tables.
+        output (str): The output string to which the table will be appended.
+        page: An object representing the page containing the tables (assumed to have a 'tables' attribute).
+        tables (list): A list of table descriptors (assumed to contain tuples with table information).
+        m (int): A counter representing the number of tables remaining to be processed.
+
+    Returns:
+        tuple: A tuple containing the updated counter `m` and the updated output string `output`.
+    """
     curr_table = tables.pop(0)
     dataframe = convert_table_to_dataframe(page.tables[curr_table[3]], text)
     output += f" \nTable: {dataframe}\n"
@@ -334,7 +441,18 @@ def transfer_table_to_output(text, output, page, tables, m):
     return m, output
 
 
-def transfer_line_to_output(output, lines, n):
+def transfer_line_to_output(output: str, lines: list[str], n: int) -> tuple[int, str]:
+    """
+    Transfers the first line from a list to an output string.
+
+    Args:
+        output: The current output string.
+        lines: The list of lines to be transferred.
+        n: The remaining number of lines to be transferred.
+
+    Returns:
+        A tuple containing the updated number of remaining lines and the updated output string.
+    """
     curr_line = lines.pop(0)
     output += curr_line[0]
     n -= 1
@@ -351,8 +469,9 @@ def gs_bucket_bypass(
     chunk_index: int,
     chunk_size: int,
 ) -> list[str]:
-    """This is a method designed for testing purpose. This avoids the storage-and-retrieval part
-        from the normal pipeline but does the same processing on each chunk.
+    """
+    This is a method designed for testing purpose. This avoids the storage-and-retrieval part
+    from the normal pipeline but does the same processing on each chunk.
 
     Args:
         pdf_reader {PyPDF2.PdfReader} -- PdfReader object to get the raw text from.
@@ -389,8 +508,9 @@ def gs_bucket_bypass(
 
 
 def process_document_in_chunks(file_path: str) -> list[str]:
-    """This method is the starting point of Argonaut's DocAI-based PDF processing pipeline. Here,
-        the document gets split into 15-page chunks and each chunk gets processed one after another.
+    """
+    This method is the starting point of Argonaut's DocAI-based PDF processing pipeline. Here,
+    the document gets split into 15-page chunks and each chunk gets processed one after another.
 
     Arguments:
         file_path {str} -- Path of the file to be processed.
@@ -437,7 +557,6 @@ def process_document_in_chunks(file_path: str) -> list[str]:
                 chunk_index,
                 chunk_size,
             )
-
 
     except Exception as e:
         # Handle the exception here
