@@ -360,21 +360,21 @@ def process_chunk(document: documentai.Document) -> list[str]:
             # Get the text data in the page in the form of a list of text blocks.
             tables, lines = extract_text_data(page, text)
 
-            m = len(tables)
-            n = len(lines)
+            remaining_tables = len(tables)
+            remaining_lines = len(lines)
 
-            while m > 0 or n > 0:
-                if m > 0 and n > 0:
+            while remaining_tables > 0 or remaining_lines > 0:
+                if remaining_tables > 0 and remaining_lines > 0:
                     if lines[0][2] < tables[0][2]:
-                        n, page_text = transfer_line_to_output(page_text, lines, n)
+                        remaining_lines, page_text = transfer_line_to_output(page_text, lines, remaining_lines)
                     else:
-                        m, page_text = transfer_table_to_output(text, page_text, page, tables, m)
-                elif m == 0:
-                    while n > 0:
-                        n, page_text = transfer_line_to_output(page_text, lines, n)
+                        remaining_tables, page_text = transfer_table_to_output(text, page_text, page, tables, remaining_tables)
+                elif remaining_tables == 0:
+                    while remaining_lines > 0:
+                        remaining_lines, page_text = transfer_line_to_output(page_text, lines, remaining_lines)
                 else:
-                    while m > 0:
-                        m, page_text = transfer_table_to_output(text, page_text, page, tables, m)
+                    while remaining_tables > 0:
+                        remaining_tables, page_text = transfer_table_to_output(text, page_text, page, tables, remaining_tables)
             output.append(page_text.replace("\\n", "\n"))
 
     except Exception as e:
@@ -414,7 +414,7 @@ def process_blocks(chunk_index: int, chunk_size: int, document: documentai.Docum
     return output
 
 
-def transfer_table_to_output(text: str, output: str, page: documentai.Document.Page, tables: list, m: int) -> tuple[int, str]:
+def transfer_table_to_output(text: str, output: str, page: documentai.Document.Page, tables: list, remaining_tables: int) -> tuple[int, str]:
     """
     Extracts a table from a list of tables, converts it to a DataFrame, appends the DataFrame to an output string, and decrements a counter.
 
@@ -423,7 +423,7 @@ def transfer_table_to_output(text: str, output: str, page: documentai.Document.P
         output (str): The output string to which the table will be appended.
         page: An object representing the page containing the tables (assumed to have a 'tables' attribute).
         tables (list): A list of table descriptors (assumed to contain tuples with table information).
-        m (int): A counter representing the number of tables remaining to be processed.
+        remaining_tables (int): A counter representing the number of tables remaining to be processed.
 
     Returns:
         tuple: A tuple containing the updated counter `m` and the updated output string `output`.
@@ -431,26 +431,26 @@ def transfer_table_to_output(text: str, output: str, page: documentai.Document.P
     curr_table = tables.pop(0)
     dataframe = convert_table_to_dataframe(page.tables[curr_table[3]], text)
     output += f" \nTable: {dataframe}\n"
-    m -= 1
-    return m, output
+    remaining_tables -= 1
+    return remaining_tables, output
 
 
-def transfer_line_to_output(output: str, lines: list[str], n: int) -> tuple[int, str]:
+def transfer_line_to_output(output: str, lines: list[str], remaining_lines: int) -> tuple[int, str]:
     """
     Transfers the first line from a list to an output string.
 
     Args:
         output: The current output string.
         lines: The list of lines to be transferred.
-        n: The remaining number of lines to be transferred.
+        remaining_lines: The remaining number of lines to be transferred.
 
     Returns:
         A tuple containing the updated number of remaining lines and the updated output string.
     """
     curr_line = lines.pop(0)
     output += curr_line[0]
-    n -= 1
-    return n, output
+    remaining_lines -= 1
+    return remaining_lines, output
 
 
 def gs_bucket_bypass(
