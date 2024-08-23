@@ -5,7 +5,7 @@ pdf_extraction: with_tables
 pdf_chunking: by_title
 html_extraction: custom
 
-docai_project_id: dauren-genai-bb
+docai_project_id: null
 docai_dococr_processor_id: 5d106d45b46ec280
 docai_location: us
 docai_dococr_processor_version: pretrained-ocr-v2.0-2023-06-02
@@ -14,5 +14,6 @@ project_id: null
 dataset_id: dataset
 table_name: parsing_table
 data_store_id: data_store_id
+datastore_location: global
 
 bucket_parse_interval: 600
