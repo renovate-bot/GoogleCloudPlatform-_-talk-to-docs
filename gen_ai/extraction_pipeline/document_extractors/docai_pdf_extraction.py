@@ -7,12 +7,6 @@ from google.cloud import documentai
 import pandas as pd
 from PyPDF2 import PdfReader, PdfWriter
 
-GCP_PROJECT_ID = "dauren-genai-bb" #os.environ["GCP_PROJECT_ID"]
-DOCOCR_PROCESSOR_ID = "5d106d45b46ec280" #os.environ["DOCOCR_PROCESSOR_ID"]
-GCP_PROJECT_LOCATION = "us"  # Format is "us" or "eu"
-APP_MIME_TYPE = "application/pdf"
-DOCOCR_PROCESSOR_VERSION = "pretrained-ocr-v2.0-2023-06-02"
-
 
 def extract_pdf_chunk(pdf_reader: PdfReader, start_page: int, end_page: int) -> bytes:
     """
@@ -94,6 +88,7 @@ def process_document(
     pdf_reader: PdfReader,
     start_page: int,
     end_page: int,
+    config: dict[str, str],
     process_options: Optional[documentai.ProcessOptions] = None,
 ) -> documentai.Document:
     """
@@ -104,19 +99,18 @@ def process_document(
         pdf_reader {PdfReader} -- A PDF reader object.
         start_page {int} -- The starting page number to process.
         end_page {int} -- The ending page number to process.
+        config {dict[str, str]} -- Configuration parameters necessary for DocAI
         process_options {documentai.ProcessOptions} -- An optional field to set config for DocOCR.
+        
     Returns:
         documentai.Document: The processed Document AI document, or None if an error occurs.
     """
-
-    project_id = GCP_PROJECT_ID  # The Google Cloud Platform (GCP) project ID.
-    location = GCP_PROJECT_LOCATION  # The GCP location where the processor is deployed.
-    mime_type = APP_MIME_TYPE  # The MIME type of the document.
-    processor_id = DOCOCR_PROCESSOR_ID  # The ID of the processor from DocAI
-    processor_version = (
-        DOCOCR_PROCESSOR_VERSION
-    )  # version of the processor to be used. Default is 'rc'.
-
+    project_id = config.get("docai_project_id")
+    location = config.get("docai_location")
+    mime_type = "application/pdf"
+    processor_id = config.get("docai_dococr_processor_id")
+    processor_version = (config.get("docai_dococr_processor_version"))
+    
     try:
         # You must set the `api_endpoint` if you use a location other than "us".
         client = documentai.DocumentProcessorServiceClient(
@@ -468,6 +462,7 @@ def gs_bucket_bypass(
     end_page: int,
     chunk_index: int,
     chunk_size: int,
+    config: dict[str, str]
 ) -> list[str]:
     """
     This is a method designed for testing purpose. This avoids the storage-and-retrieval part
@@ -482,6 +477,7 @@ def gs_bucket_bypass(
         end_page {int} -- Last page index to be considered in the chunk.
         chunk_index {int} -- Integer index of the current chunk.
         chunk_size {int} -- The size limit of a chunk in pages. For DocAI, it is 15.
+        config {dict[str, str]} -- Configuration parameters necessary for DocAI
 
     Returns:
         list[str] -- An updated `output` list with the text output of the current chunk appeneded at
@@ -494,11 +490,12 @@ def gs_bucket_bypass(
         start_page,
         end_page,
         process_options=process_options,
+        config=config,
     )
 
     if document is not None:
         # Process the current chunk and print the results
-        curr_chunk_output = process_chunk(chunk_index, chunk_size, document)
+        curr_chunk_output = process_chunk(document)
         output += curr_chunk_output
         terms_boxes = process_blocks(chunk_index, chunk_size, document)
         blocks[0].extend(terms_boxes[0])
@@ -507,7 +504,7 @@ def gs_bucket_bypass(
     return output, blocks
 
 
-def process_document_in_chunks(file_path: str) -> list[str]:
+def process_document_in_chunks(file_path: str, config: dict[str, str]) -> list[str]:
     """
     This method is the starting point of Argonaut's DocAI-based PDF processing pipeline. Here,
     the document gets split into 15-page chunks and each chunk gets processed one after another.
@@ -556,6 +553,7 @@ def process_document_in_chunks(file_path: str) -> list[str]:
                 end_page,
                 chunk_index,
                 chunk_size,
+                config,
             )
 
     except Exception as e:

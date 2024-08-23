@@ -130,7 +130,7 @@ class PdfExtractor(BaseExtractor):
             self.elements = extractor.extract_document(True)
         elif self.pdf_extraction == "docai":
             extractor = DocaiPdfExtractor(self.filepath)
-            self.elements = extractor.extract_document()
+            self.elements = extractor.extract_document(self.config_file_parameters)[0]
         else:
             extractor = DefaultPdfExtractor(self.filepath)
             self.elements = extractor.extract_document()
@@ -213,13 +213,13 @@ class DocaiPdfExtractor(DefaultPdfExtractor):
     def __init__(self, filepath: str):
         super().__init__(filepath)
 
-    def extract_document(self) -> list[Text]:
+    def extract_document(self, config: dict[str, str]) -> list[Text]:
         """Extracts the Document object from the pdf file.
 
         Returns:
             TODO: Document: The extracted Document object.
         """
-        return process_document_in_chunks(self.filepath)
+        return process_document_in_chunks(self.filepath, config)
 
 
 class DefaultPdfMetadataCreator:
@@ -342,9 +342,7 @@ class DocaiPdfChunker(DefaultPdfChunker):
 
         output_chunks = {}
         for doc in self.elements:
-            print(doc)
             chunks = text_splitter.split_text(doc)
-            print(chunks)
             doc_name = doc.split("\n")[0]
             for i in range(len(chunks)):
                 chunk_id = f"{doc_name}_{i}"
