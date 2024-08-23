@@ -474,81 +474,10 @@ class CustomJsonChunkerTwo(DefaultJsonChunker):
 
 
 class CustomJsonChunkerThree(CustomJsonChunkerTwo):
-    def chunk_the_document_auto(self) -> dict[tuple[str, str], str]:
-        """Creates text chunks from a Custom B360 JSON document.
+    """Parses Custom B360 JSON data and creates text chunks organized by benefit.
 
-        Returns:
-            dict[tuple[str, str], str]: A dictionary where keys are tuples of
-                (benefit ID, section name), and values are the corresponding
-                concatenated text chunks.
-        """
-        print("CustomJsonChunkerThree")
-        def strip_key(parent, key):
-            if key.startswith(parent):
-                return key[len(parent):]
-            return key
-
-        def extract_from_string(item):
-            return DefaultHtmlIngestor.extract_from_html_using_markdownify(item)
-
-        def extract_from_list(parent, item):
-            result = ""
-            for value in item:
-                if isinstance(value, list):
-                    result += f"{extract_from_list(parent, value)}" + "\n"
-                elif isinstance(value, dict):
-                    result += f"{extract_from_dict(parent, value)}" + "\n"
-                elif isinstance(value, str):
-                    result += extract_from_string(value)
-            return result
-
-        def extract_from_dict(parent: str, item):
-            result = ""
-            if item is None:
-                print(parent)
-                print(item)
-            for key, value in item.items():
-                if value:
-                    if isinstance(value, list):
-                        result += f"{extract_from_list(parent, value)}" + "\n"
-                    elif isinstance(value, dict):
-                        result += f"{extract_from_dict(parent, value)}" + "\n"
-                    elif isinstance(value, str):
-                        result += f"{strip_key(parent, key)}: {extract_from_string(value)}\n"
-            return result
-        
-        output_data = {}
-        benefit_id = self.data["BenefitPlan"].get("BenefitPlanID")
-        for item in self.data["BenefitPlan"]['BenefitPlanCSRSection']['BenefitPlanCSR']:
-            section_name = item.get("BenefitPlanCSRName")
-            if section_name:
-                text = extract_from_dict("BenefitPlanCSR", item)
-            if (benefit_id, section_name) not in output_data:
-                output_data[(benefit_id, section_name)] = text
-            else:
-                print(section_name)
-
-        for item in self.data["BenefitPlan"]['BenefitPlanCostShareSections']['PlanCostShareSection']:
-            text = ""
-            section_name = item.get("PlanCostShareSectionName")
-            if section_name:
-                text = extract_from_dict("PlanCostShare", item)
-            if (benefit_id, section_name) not in output_data:
-                output_data[(benefit_id, section_name)] = text
-            else:
-                print(section_name)
-
-        for item in self.data["BenefitPlan"]['BenefitPlanSections']['BenefitSection']:
-            section_name = item.get("BenefitSectionName")
-            if section_name:
-                text = extract_from_dict("Benefit", item)
-            if (benefit_id, section_name) not in output_data:
-                output_data[(benefit_id, section_name)] = text
-            else:
-                print(section_name)
-        return output_data
-    
-
+    Inherits from the DefaultJsonChunker class.
+    """
     def chunk_the_document(self) -> dict[tuple[str, str], str]:
         """Creates text chunks from a Custom B360 JSON document.
 
@@ -767,7 +696,9 @@ class JsonExtractor(BaseExtractor):
         return True
 
     def process(self, output_dir: str) -> bool:
-        """Main function that controls the processing of a JSON document, including extraction, metadata creation, chunking, and file saving.
+        """
+        Main function that controls the processing of a JSON document, including extraction,
+        metadata creation, chunking, and file saving.
 
         This function coordinates the key steps for processing a JSON document.
         It handles document extraction, metadata generation, applies  document
