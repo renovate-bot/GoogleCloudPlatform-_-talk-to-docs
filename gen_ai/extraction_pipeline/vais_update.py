@@ -33,6 +33,8 @@ def update_the_data_store(input_dir: str, config: dict[str, str], data_store_id:
     project_id = config.get("project_id")
     dataset_id = config.get("dataset_id")
     table_name = config.get("table_name")
+    location = config.get("datastore_location")
+
     if not data_store_id or data_store_id == "datastore":
         data_store_id = config.get("data_store_id")
 
@@ -59,6 +61,7 @@ def update_the_data_store(input_dir: str, config: dict[str, str], data_store_id:
     # fetch to data store
     updated_data_store = import_to_datastore_batched(
         project_id,
+        location,
         data_store_id,
         df,
         batch_size=100
@@ -213,7 +216,7 @@ def insert_all_rows(df: pd.DataFrame, client, table_id: str):
         return False
 
 
-def import_to_datastore_batched(project_id: str, data_store_id: str, df: pd.DataFrame, batch_size=100):
+def import_to_datastore_batched(project_id: str, location: str, data_store_id: str, df: pd.DataFrame, batch_size=100):
     """
     Imports data from a Pandas DataFrame to a Google Cloud Discovery Engine Datastore in batches.
 
@@ -237,12 +240,17 @@ def import_to_datastore_batched(project_id: str, data_store_id: str, df: pd.Data
     ]
 
     # 2. Prepare and send documents in batches
-    parent = f"projects/{project_id}/locations/global/collections/default_collection/dataStores/{data_store_id}/branches/0"
-    url = f"https://discoveryengine.googleapis.com/v1/{parent}/documents:import"
+    parent = f"projects/{project_id}/locations/{location}/collections/default_collection/dataStores/{data_store_id}/branches/0"
+    if location == "global":
+        url = f"https://discoveryengine.googleapis.com/v1/{parent}/documents:import"
+    else:
+        url = f"https://{location}-discoveryengine.googleapis.com/v1/{parent}/documents:import"
+
     headers = {
         "Authorization": f"Bearer {auth_token}",
         "Content-Type": "application/json",
     }
+
     total_count = 0
     success_count = 0
     for i in range(0, len(all_rows), batch_size):
