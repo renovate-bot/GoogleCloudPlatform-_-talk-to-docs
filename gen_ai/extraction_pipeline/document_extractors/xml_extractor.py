@@ -1,4 +1,7 @@
-"""Provides the XmlExtractor class for extracting textual data from XML (.xml) files and organizing the extracted data into separate files for structured document processing."""
+"""
+Provides the XmlExtractor class for extracting textual data from XML (.xml) files and organizing t
+he extracted data into separate files for structured document processing.
+"""
 
 from io import StringIO
 import json
@@ -27,9 +30,9 @@ class XmlExtractor(BaseExtractor):
         config_file_parameters (dict[str, str]): Stores the configuration
             parameters.
         xml_extraction (str): Configuration parameter fot the extraction method.
-            Defaults to 'default'.
+            Defaults to "default".
         xml_chunking (str):  Configuration parameter fot the chunking method.
-            Defaults to 'default'.
+            Defaults to "default".
     """
 
     def __init__(self, filepath: str, config_file_parameters: dict[str, str]):
@@ -77,7 +80,7 @@ class XmlExtractor(BaseExtractor):
 
         Args:
             metadata (dict[str, str]): A dictionary containing document
-              metadata, including a 'filename' key.
+              metadata, including a "filename" key.
             section_name (str): The name of the section being saved.
             output_dir (str): The directory where the generated file should be
               saved.
@@ -133,7 +136,8 @@ class XmlExtractor(BaseExtractor):
 
     def process(self, output_dir: str) -> bool:
         """
-        Main function that controls the processing of a XML file, including extraction, metadata creation, chunking, and file saving.
+        Main function that controls the processing of a XML file, including extraction, 
+        metadata creation, chunking, and file saving.
 
         This method assumes the file is in a suitable XML format for the chunking
         logic.
@@ -188,9 +192,9 @@ class CustomXmlExtractor(BaseExtractor):
         config_file_parameters (dict[str, str]): Stores the configuration
             parameters.
         xml_extraction (str): Configuration parameter fot the extraction method.
-            Defaults to 'default'.
+            Defaults to "default".
         xml_chunking (str):  Configuration parameter fot the chunking method.
-            Defaults to 'default'.
+            Defaults to "default".
     """
 
     def __init__(self, filepath: str, config_file_parameters: dict[str, str]):
@@ -203,7 +207,10 @@ class CustomXmlExtractor(BaseExtractor):
         self.data = None
 
     def modify_file(self):
-        """Modifies an existing file by adding a ProcessGroup block and other blocks if they are not already present within the file."""
+        """
+        Modifies an existing file by adding a ProcessGroup block and other blocks if 
+        they are not already present within the file.
+        """
         with open(self.filepath, "r", encoding="utf-8") as file:
             original_lines = file.readlines()
 
@@ -396,7 +403,7 @@ class DefaultXmlIngestor:
                 xml = f.read()
             it = ET.iterparse(StringIO(xml))
             for _, el in it:
-                _, _, el.tag = el.tag.rpartition('}')
+                _, _, el.tag = el.tag.rpartition("}")
             return it.root
         except OSError as e:
             print(f"Error: Unable to open or process the file '{self.filepath}' due to an OS error: {e}")
@@ -404,7 +411,7 @@ class DefaultXmlIngestor:
         except ET.ParseError as e:
             print(f"Error: Invalid XML format in '{self.filepath}': {e}")
             return None
-        
+
 class CustomXmlMetadataCreator():
     """
     Custom personalized class for creating metadata from xml files.
@@ -425,7 +432,8 @@ class CustomXmlMetadataCreator():
                 - title (str): The title of the transcript.
                 - date (str): The date of the transcript.
                 - companies (list[str]): A list of companies mentioned in the transcript.
-                - participants (dict[str, str]): A dictionary of participant IDs and their information (title, affiliation, name).
+                - participants (dict[str, str]): A dictionary of participant IDs and their 
+                  information (title, affiliation, name).
         """
         metadata = {}
         root = self.data.find("meta")
@@ -448,9 +456,9 @@ class CustomXmlMetadataCreator():
                     name = participant.text
                     participant_info = ""
                     if title:
-                        participant_info += f'{title}'
+                        participant_info += f"{title}"
                     if affiliation:
-                        participant_info += f', {affiliation}'
+                        participant_info += f", {affiliation}"
                     participant_info += f"\n{name}"
                     participants[participant_id] = participant_info
                 metadata["participants"] = participants

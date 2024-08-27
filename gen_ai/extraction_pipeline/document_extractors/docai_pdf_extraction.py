@@ -1,3 +1,8 @@
+"""
+This module provides functions for processing PDF documents using Google Document AI, enabling 
+efficient extraction and structuring of textual and tabular data from PDF files.
+"""
+
 from io import BytesIO
 import traceback
 from typing import Optional, Sequence
@@ -31,7 +36,7 @@ def extract_pdf_chunk(pdf_reader: PdfReader, start_page: int, end_page: int) -> 
         chunk_pdf_content = BytesIO()
         writer.write(chunk_pdf_content)
         chunk_pdf_content.seek(0)
-    except Exception as e:
+    except Exception as e: # pylint: disable=W0718
         # Handle the exception here
         traceback.print_exc()
         print("An error occurred:", str(e))
@@ -40,7 +45,7 @@ def extract_pdf_chunk(pdf_reader: PdfReader, start_page: int, end_page: int) -> 
 
 
 def list_blocks(
-        blocks: Sequence[documentai.Document.Page.Block], 
+        blocks: Sequence[documentai.Document.Page.Block],
         text: str, page_number: int
 ) -> list[list[list[str, float, int]]]:
     """
@@ -109,17 +114,14 @@ def process_document(
     location = config.get("docai_location")
     mime_type = "application/pdf"
     processor_id = config.get("docai_dococr_processor_id")
-    processor_version = (config.get("docai_dococr_processor_version"))
-    
+    processor_version = config.get("docai_dococr_processor_version")
+
     try:
         # You must set the `api_endpoint` if you use a location other than "us".
         client = documentai.DocumentProcessorServiceClient(
             client_options=ClientOptions(api_endpoint=f"{location}-documentai.googleapis.com")
         )
 
-        # The full resource name of the processor version, e.g.:
-        # `projects/{project_id}/locations/{location}/processors/{processor_id}/processorVersions/{processor_version_id}`
-        # You must create a processor before running this sample.
         name = client.processor_version_path(project_id, location, processor_id, processor_version)
 
         # Extract the relevant pages for the current chunk
@@ -138,7 +140,7 @@ def process_document(
         )
 
         result = client.process_document(request=request)
-    except Exception as e:
+    except Exception as e: # pylint: disable=W0718
         # Handle the exception here
         traceback.print_exc()
         print(f"An error occurred while processing pages {start_page} to {end_page}:", str(e))
@@ -151,11 +153,13 @@ def layout_to_text(layout: documentai.Document.Page.Layout, text: str) -> str:
     Extracts and concatenates text segments from a Document AI layout into a single string.
 
     Args:
-        layout (documentai.Document.Page.Layout): The layout object containing information about text segments and their offsets within the document.
+        layout (documentai.Document.Page.Layout): The layout object containing information about text segments 
+        and their offsets within the document.
         text (str): The entire text content of the document.
 
     Returns:
-        str: The concatenated text extracted from the layout, representing the textual content identified within the specified layout.
+        str: The concatenated text extracted from the layout, representing the textual content identified within 
+             the specified layout.
     """
     response = ""
     # If a text segment spans several lines, it will
@@ -171,7 +175,8 @@ def extract_text_data(page: documentai.Document.Page, text: str) -> tuple[list[l
     """
     Extracts textual data from a Document AI page, separating table data from non-table text lines.
     The function processes the page's tables, identifies their dimensions, and extracts their content.
-    It then distinguishes text lines that are not part of any table and sorts both tables and text lines based on their vertical position.
+    It then distinguishes text lines that are not part of any table and sorts both tables and text lines based 
+    on their vertical position.
 
 
     Args:
@@ -181,7 +186,8 @@ def extract_text_data(page: documentai.Document.Page, text: str) -> tuple[list[l
     Returns:
         A tuple containing:
             - sorted_tables: A list of sorted tables, each represented as a list of table rows (lists of strings).
-            - sorted_text_lines_only: A list of sorted text lines not belonging to any table, along with their coordinates and original line index.
+            - sorted_text_lines_only: A list of sorted text lines not belonging to any table, along with their
+              coordinates and original line index.
     """
     all_table_cells = {}
     all_table_rows = {}
@@ -223,7 +229,7 @@ def extract_text_data(page: documentai.Document.Page, text: str) -> tuple[list[l
                 line_in_text_block = True
                 break
         # append the line once you confirm its not part of a table
-        if line_in_text_block == False:
+        if line_in_text_block is False:
             text_lines_only.append(
                 (
                     layout_to_text(line.layout, text),
@@ -311,7 +317,8 @@ def process_table_row(
 
 def convert_table_to_dataframe(table: documentai.Document.Page.Table, text: str) -> str:
     """
-    Converts a structured table object (with header and body rows) into a Pandas DataFrame, then to a LaTeX table string.
+    Converts a structured table object (with header and body rows) into a Pandas DataFrame, 
+    then to a LaTeX table string.
 
     Args:
         table: The table object containing header_rows and body_rows, each row consisting of cells with layouts.
@@ -368,16 +375,28 @@ def process_chunk(document: documentai.Document) -> list[str]:
                     if lines[0][2] < tables[0][2]:
                         remaining_lines, page_text = transfer_line_to_output(page_text, lines, remaining_lines)
                     else:
-                        remaining_tables, page_text = transfer_table_to_output(text, page_text, page, tables, remaining_tables)
+                        remaining_tables, page_text = transfer_table_to_output(
+                            text,
+                            page_text,
+                            page,
+                            tables,
+                            remaining_tables
+                        )
                 elif remaining_tables == 0:
                     while remaining_lines > 0:
                         remaining_lines, page_text = transfer_line_to_output(page_text, lines, remaining_lines)
                 else:
                     while remaining_tables > 0:
-                        remaining_tables, page_text = transfer_table_to_output(text, page_text, page, tables, remaining_tables)
+                        remaining_tables, page_text = transfer_table_to_output(
+                            text,
+                            page_text,
+                            page,
+                            tables,
+                            remaining_tables
+                        )
             output.append(page_text.replace("\\n", "\n"))
 
-    except Exception as e:
+    except Exception as e: # pylint: disable=W0718
         # Handle the exception here
         traceback.print_exc()
         print("An error occurred:", str(e))
@@ -407,16 +426,23 @@ def process_blocks(chunk_index: int, chunk_size: int, document: documentai.Docum
             blocks = list_blocks(page.blocks, text, page_number)
             output[0].extend(blocks[0])
             output[1].extend(blocks[1])
-    except Exception as e:
+    except Exception as e: # pylint: disable=W0718
         # Handle the exception here
         traceback.print_exc()
         print("An error occurred:", str(e))
     return output
 
 
-def transfer_table_to_output(text: str, output: str, page: documentai.Document.Page, tables: list, remaining_tables: int) -> tuple[int, str]:
+def transfer_table_to_output(
+        text: str,
+        output: str,
+        page: documentai.Document.Page,
+        tables: list,
+        remaining_tables: int
+) -> tuple[int, str]:
     """
-    Extracts a table from a list of tables, converts it to a DataFrame, appends the DataFrame to an output string, and decrements a counter.
+    Extracts a table from a list of tables, converts it to a DataFrame, appends the DataFrame to an output 
+    string, and decrements a counter.
 
     Args:
         text (str): The text containing the tables.
@@ -556,7 +582,7 @@ def process_document_in_chunks(file_path: str, config: dict[str, str]) -> list[s
                 config,
             )
 
-    except Exception as e:
+    except Exception as e: # pylint: disable=W0718
         # Handle the exception here
         traceback.print_exc()
         print("An error occurred:", str(e))
