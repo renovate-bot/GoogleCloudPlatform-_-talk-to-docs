@@ -1,7 +1,8 @@
-from gen_ai.common.exponential_retry import LLMExponentialRetryWrapper
+from gen_ai.common.exponential_retry import LLMExponentialRetryWrapper, timeout_llm_call
 import pytest
 from unittest.mock import Mock, patch
 from google.api_core.exceptions import InternalServerError
+from time import sleep
 
 
 def test_successful_execution_no_retry():
@@ -35,3 +36,39 @@ def test_max_retry_exceeded():
 
     assert "failed after 15 retries" in str(exc_info.value)
     assert mock_chain.run.call_count == 15
+
+
+def test_timeout_decorator_success():
+    """
+    Tests if the `timeout_llm_call` decorator works as expected when the decorated 
+    function completes within the specified timeout.
+    """
+
+    @timeout_llm_call(timeout=10)
+    def mock_function():
+        return "Success"
+    result = mock_function()
+
+    assert result=="Success"
+
+
+def test_timeout_decorator_exceed_timeout():
+    """
+    Tests the `timeout_llm_call` decorator's handling of timeouts.
+
+    Verifies that a function exceeding the specified timeout is interrupted,
+    and the returned result is as expected:
+    - `score` is 0.
+    - `result` contains the expected "answer" key.
+    - `result["answer"]` is the expected timeout message.
+    """
+
+    @timeout_llm_call(timeout=0.1)
+    def mock_function(*args, **kwargs):
+        sleep(1) 
+        return "This should not be returned"
+
+    result, score = mock_function()
+    assert score == 0
+    assert "answer" in result
+    assert result["answer"]=="I was not able to answer this question"

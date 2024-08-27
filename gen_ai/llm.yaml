@@ -1,33 +1,37 @@
 # This file defines the LLM prompts and configuration parameters used
 # to converse with a user.
 # Project and User specific configuration
-bq_project_id: dauren-genai-bb # change for the user's project id
+bq_project_id: null # leave null to use ADC and write BQ logs to the deployment project - change to customize BQ location to another project
 dataset_name: dataset_name # change for new project
 gcs_source_bucket: gs://bucket location # change for new project
-terraform_credentials: terraform-service-account-credentials.json # change for the user
 terraform_instance_name: talk-to-docs-instance
 terraform_redis_name: talk-to-docs-redis-instance
-memory_store_ip: 10.151.191.44 # change to your redis IP
+memory_store_ip: redis.t2xservice.internal # leave as is to use the default redis instance created by Terraform - change to use a different redis instance private IP
 customer_name: Customer # change for new project (gradio)
 customer_logo: https://www.gstatic.com/pantheon/images/welcome/supercloud.svg # change for new project
 processed_files_dir: /mnt/resources/{dataset_name}/main_folder
 vector_store_path: gen_ai/vector_store
 users_file: /mnt/resources/users.json
 logs_directory: gen_ai/logs
-gradio_root_path: /t2x-mig-ui
+gradio_root_path: /t2x-ui
 # Technical configuration
-model_name: gemini-1.5-flash-preview-0514
-scoring_model_name: gemini-1.5-flash-preview-0514
+model_name: gemini-1.5-flash-001
+scoring_model_name: gemini-1.5-flash-001
 embeddings_name: vertexai
 embeddings_model_name: textembedding-gecko@003
-vector_name: chroma
+vector_name: vais
 document_retriever: semantic #custom is for custom use case
+vais_staging_bucket: null # should be set if want to use existing bucket
+vais_data_store: null # replace with data store ID to be created in Terraform and used by T2X
+vais_engine_id: null # replace with search engine ID to be created in Terraform and used by T2X
+vais_location: us # us/global
+use_prev_and_next_pieces: 1 # integer between 0 and 3
 api_mode: stateless
 personalization: true
 temperature: 0.5
 max_output_tokens: 4000
 max_context_size: 1025000
-max_rounds: 2
+max_rounds: 1
 similar_questions_number: 0
 use_full_documents: true
 use_relevancy_score: false
@@ -38,10 +42,183 @@ max_number_of_docs_retrieved_mmr: 3
 previous_conversations_number: 2
 previous_conversation_score_threshold: 2
 parallel_main_llm_calls: 5
+parallel_main_llm_timeout: 15
+separate_confidence_score: true
 
 is_debug: false
 print_system_metrics: true
 debug_info: false
+
+substring_matching_prompt: |
+  You are a professional string matcher. You receive left string and right string. Your goal is to say how much of the left string is contained in the right string.
+
+  <Examples>
+    <Example1>
+      <left_string>
+        Hello, how are you?
+      </left_string>
+      <right_string>
+        Hello, how are you? I would like to know how is everything going.
+      </right_string>
+      <output>
+        {{
+          "left_in_right_score": 100
+        }}
+      </output>
+    </Example1>
+    <Example2>
+      <left_string>
+        The cat sat on the mat. It also saw the dog.
+      </left_string>
+      <right_string>
+        The cat sat on the mat.
+      </right_string>
+      <output>
+        {{
+          "left_in_right_score": 50
+        }}
+      </output>
+    </Example2>
+
+  </Examples>
+
+
+  <Instructions>
+    - Look at the left string and right string return left_in_right_score. It should be a number between 0 and 100.
+    - Use reasoning and step-by-step thinking.
+    - The output MUST BE A VALID JSON object. This requires the following:
+      - Ensure that the JSON structure includes curly braces at the beginning and end of the object.
+      - Use double quotes for all keys and string values.
+      - Ensure that keys and values are separated by a colon.
+      - Separate multiple key-value pairs with commas.
+      - Avoid trailing commas after the last key-value pair.
+      - Avoid ticks "`"" and triple ticks "```"" in the response.
+      - Special characters in strings should be escaped using backslashes (e.g., use \\" for double quotes within strings).
+      - Response format - all the fields need to be returned as strings. 
+    - Response format JSON - all the fields need to be returned as strings. 
+        {{
+          "left_in_right_score": <Number between 0 and 100 indicating how much of the left string is contained in the right string>
+        }}
+  </Instructions>
+
+  Now it's your turn!
+  <LeftString>{left_string}</LeftString>
+  <RightString>{right_string}</RightString>
+
+golden_answer_scoring_prompt: |
+  You are a professional answer scorer. You receive the expected answer and the actual answer. Your mission is to say how correct is the actual answer.
+  You also receive a question that was asked, it can help you to evaluate similarity between asnwers. Compare the expected answer and the actual answer.
+  <Examples>
+    <Question>
+      My doctor said the code she was billing is 77061; can you confirm that's covered?
+    </Question>
+    <ExpectedAnswer>
+      Yes, this is covered as preventive, because 77061 is a valid CPT code.
+    </ExpectedAnswer>
+    <ActualAnswer>
+      77061 is a valid CPT code for 3D mammography and would be covered as preventive.
+    </ActualAnswer>
+    <Output>
+      <correctness_score>100</correctness_score>
+    </Output>
+  </Examples>
+
+  <Instructions>
+    - Look at the question and answer and return correctness_score for the answer. It should be a number between 0 and 100.
+    - Use reasoning and step-by-step thinking.
+    - The output MUST BE A VALID JSON object. This requires the following:
+      - Ensure that the JSON structure includes curly braces at the beginning and end of the object.
+      - Use double quotes for all keys and string values.
+      - Ensure that keys and values are separated by a colon.
+      - Separate multiple key-value pairs with commas.
+      - Avoid trailing commas after the last key-value pair.
+      - Avoid ticks "`"" and triple ticks "```"" in the response.
+      - Special characters in strings should be escaped using backslashes (e.g., use \\" for double quotes within strings).
+      - Response format - all the fields need to be returned as strings. 
+    - Response format JSON - all the fields need to be returned as strings. 
+        {{
+          "correctness_score": <Number between 0 and 100 indicating how correct is the actual answer>,
+        }}
+  </Instructions>
+
+  Now it's your turn!
+  <Question>{question}</Question>
+  <ExpectedAnswer>{expected_answer}</ExpectedAnswer>
+  <ActualAnswer>{actual_answer}</ActualAnswer>
+
+
+enhanced_prompt: |
+  You are a professional question enhancer. Your goal is to enhance a question with the user information <member_context>. 
+  Use the <member_context> below and append to the users <question> as a a prefix as shown in the examples below:
+  <Examples>
+    <Example1>
+      <member_context>
+        caller_name: Subscriber
+        subject_relationship: Self - Harry Potter
+        subject_age: 58
+        subject_gender: F
+        subject_cob_status: No OI
+      </member_context>
+      <question>
+        My doctor is recommending I start having a 3D mammography for my routine mammogram screenings. Are those covered?
+      </question>
+      <appended_question_with_member_context>
+        {{
+          "appended_question_with_member_context": I would like to know the answer to a question from the following member. The member is a subscriber, 58 years old female without any OI (other insurance coverage). Her doctor is recommending that she start having a 3D mammography for routine mammogram screenings. Are those covered?
+        }}
+      </appended_question_with_member_context>
+    </Example1>
+    <Example2>
+      <member_context>
+        caller_name: Subscriber
+        subject_relationship: Spouse
+        Plan: BoA
+        subject_age: 47
+        subject_gender: M
+        subject_cob_status: No OI
+      </member_context>
+      <question>
+        Is outpatient radiation covered?
+      </question>
+      <appended_question_with_member_context>
+        {{
+          "appended_question_with_member_context": I would like to know the answer to a question from the following member about his spouse. The member is a subscriber, his spouse is a 47 year old male without any OI (other insurance coverage). Is outpatient radiation covered?
+        }}
+      </appended_question_with_member_context>
+    </Example2>
+    <Example3>
+      <member_context>
+        caller_name: Subscriber
+        subject_relationship: CH
+        Plan: BoA
+        subject_age: 8
+        subject_gender: F
+        subject_cob_status: No OI
+      </member_context>
+      <question>
+        My child was hit with a baseball and knocked out a permanent tooth. Will my insurance cover a replacement tooth?
+      </question>
+      <appended_question_with_member_context>
+        {{
+          "appended_question_with_member_context": I would like to know the answer to a question from the following member about his child. The member is a subscriber, and the child is an 8 year old female without any OI (other insurance coverage). Her child was hit with a baseball and knocked out a permanent tooth. Will the insurance cover a replacement tooth?
+        }}
+      </appended_question_with_member_context>
+    </Example3>
+  </Examples>
+
+  <Instructions>
+     - Return JSON in the following format:
+       Response format - all the fields need to be returned as strings. 
+        {{
+          "appended_question_with_member_context": <appended question with member context>
+        }}
+    - Avoid using First Name and Last Name of the person
+  </Instructions>
+
+  Now it's your turn!
+  <MemberContext>{member_context}</MemberContext>
+  <Question>{question}</Question>
+
 
 previous_conversation_scoring_prompt: |
   You are an expert relevance evaluator tasked with determining how relevant a previous conversation is to a specific question. Your evaluation must be provided in a JSON format. Detailed guidelines for the JSON response format and evaluation criteria are outlined below.
@@ -193,7 +370,8 @@ retriever_scoring_prompt: |
   <Question>{question}</Question>
 
 answer_scoring_prompt: |
-  You are a professional answer scorer. You receive the question and the answer. Your mission is to say how helpful is the answer to the question.
+  You are a professional answer scorer. You receive the question and the answer. 
+  Your mission is to say how confident you are the answer to the question is correct.
   <Examples>
     <Question>
       My doctor is recommending I start having a 3D mammography for my routine mammogram screengings. Are those covered?
@@ -202,14 +380,14 @@ answer_scoring_prompt: |
       Preventive 3D Mammography is covered. When received INN, there is no charge and no deductible applies; prior authorization is not required to receive this care.
     </Answer>
     <Output>
-      <helpfullness_score>5</helpfullness_score>
-      <answer_helpfullness_resoning>The question asks about coverage details for 3D mammograms. The answer is helpful and complete.</answer_helpfullness_resoning>
+      <confidence_score>100</confidence_score>
+      <answer_confidence_resoning>The question asks about coverage details for 3D mammograms. The answer is helpful, complete and factual. Therefore I am confident it is correct.</answer_confidence_resoning>
     </Output>
   </Examples>
 
   <Instructions>
-    - Look at the question and answer and return helpfullness_score for the answer. It should be a number between 1 and 5.
-    - Use reasoning and step-by-step thinking, provide a answer_helpfullness_resoning to justify your response.
+    - Look at the question and answer and return confidence_score for the answer. It should be a number between 0 and 100.
+    - Use reasoning and step-by-step thinking, provide a answer_confidence_resoning to justify your response.
     - The output MUST BE A VALID JSON object. This requires the following:
       - Ensure that the JSON structure includes curly braces at the beginning and end of the object.
       - Use double quotes for all keys and string values.
@@ -221,8 +399,8 @@ answer_scoring_prompt: |
       - Response format - all the fields need to be returned as strings. 
     - Response format - all the fields need to be returned as strings. 
         {{
-          "helpfullness_score": <Number between 1 and 5 indicating how helpful is the answer>,
-          "answer_helpfullness_resoning": <A short summary on what information is missing to make the answer to the question completely helpful>,
+          "confidence_score": <Number between 0 and 100 indicating how confident you are in the answer correctness>,
+          "answer_confidence_resoning": <A short summary on what information is missing to make the answer to the question completely correct>,
         }}
   </Instructions>
 
@@ -314,9 +492,7 @@ simple_react_chain_prompt: |
 
 
   </Instructions>
-  Here is the context: {context}
 
-  Here is the question: {question}
   You need to provide the response in JSON format:
   {{
     "plan_and_summaries": "Here provide plan of answer and reasoning about it",
@@ -324,6 +500,22 @@ simple_react_chain_prompt: |
     "additional_information_to_retrieve": "Here provide follow-up question",
     "context_used": "Here just fill empty string"
   }}
+
+  Now it's your turn!
+  <Question>
+    {question}
+  </Question>
+  <Previous Conversation>
+    {previous_conversation}
+  </Previous Conversation>
+  <Previous Rounds>
+    {previous_rounds}
+  </Previous Rounds>
+  This marks the start of text from b360 documents. Remember that these are the member specific documents that will override kc documents, in case of a conflict re: coverage of a service.
+  <Context>
+    {context}
+  </Context>
+
 
 react_chain_prompt: |
   You are a smart, friendly and helpful chatbot for United Healthcare. 

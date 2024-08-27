@@ -276,7 +276,7 @@ def get_dataset_id() -> str:
     Raises:
         ValueError: If the project ID cannot be determined from either source.
     """
-    project_id = Container.config["bq_project_id"]
+    project_id = Container.config.get("bq_project_id")
     dataset_name = Container.config["dataset_name"]
     if not project_id:
         _, project_id = google.auth.default()
@@ -331,6 +331,7 @@ class BigQueryConverter:
             "relevance_score": [],
             "additional_question": [],
             "plan_and_summaries": [],
+            "original_question": []
         }
         max_round = len(log_snapshots) - 1
         system_state_id = Container.system_state_id or log_system_status(session_id)
@@ -396,6 +397,7 @@ class BigQueryConverter:
             data["relevance_score"].append(relevance_score)
             data["additional_question"].append(additional_question)
             data["plan_and_summaries"].append(plan_and_summaries)
+            data["original_question"].append(query_state.original_question)
 
         df = pd.DataFrame(data)
         return df

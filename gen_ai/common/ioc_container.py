@@ -30,7 +30,6 @@ from concurrent.futures import ThreadPoolExecutor
 from logging import Logger
 
 import google.auth
-import google.cloud.logging
 import redis
 from dependency_injector import containers, providers
 from google.api_core.exceptions import GoogleAPIError
@@ -46,7 +45,6 @@ from gen_ai.common.embeddings_provider import EmbeddingsProvider
 from gen_ai.common.exponential_retry import LLMExponentialRetryWrapper
 from gen_ai.common.storage import DefaultStorage
 from gen_ai.common.vector_provider import VectorStrategy, VectorStrategyProvider
-
 
 LLM_YAML_FILE = "gen_ai/llm.yaml"
 
@@ -133,8 +131,7 @@ def provide_vector_indices(regenerate: bool = False) -> Chroma:
 
     vector_strategy_provider = VectorStrategyProvider(vector_name)
     vector_strategy: VectorStrategy = vector_strategy_provider(
-        storage_interface=DefaultStorage(),
-        vectore_store_path=vectore_store_path
+        storage_interface=DefaultStorage(), config=config, vectore_store_path=vectore_store_path
     )
 
     local_vector_indices = {}
@@ -142,15 +139,12 @@ def provide_vector_indices(regenerate: bool = False) -> Chroma:
 
 
 def provide_logger() -> Logger:
-    client = google.cloud.logging.Client()
-    cloud_handler = client.get_default_handler()
     formatter = logging.Formatter("%(asctime)s: %(levelname)s: %(message)s")
     stdout_handler = logging.StreamHandler(stream=sys.stdout)
     stdout_handler.setFormatter(formatter)
 
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
-    logger.addHandler(cloud_handler)
     logger.addHandler(stdout_handler)
 
     return logger
@@ -214,6 +208,7 @@ class Container(containers.DeclarativeContainer):
 
     _input_variables_react = [
         "question",
+        "previous_conversation",
         "context",
         "previous_rounds",
         "round_number",
@@ -232,6 +227,22 @@ class Container(containers.DeclarativeContainer):
     )
     similar_questions_chain = providers.Singleton(
         provide_chain, "similar_questions_prompt", ["question", "similar_questions_number"], "similar_questions"
+    )
+
+    enhance_question_chain = providers.Singleton(
+        provide_chain, "enhanced_prompt", ["question", "member_context"], "text"
+    )
+
+    string_matcher_chain = providers.Singleton(
+        provide_chain, "substring_matching_prompt", ["left_string", "right_string"], "text", scoring_llm
+    )
+
+    golden_answer_scoring_chain = providers.Singleton(
+        provide_chain,
+        "golden_answer_scoring_prompt",
+        ["question", "actual_answer", "expected_answer"],
+        "text",
+        scoring_llm,
     )
 
     previous_conversation_relevancy_chain = providers.Singleton(

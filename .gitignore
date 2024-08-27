@@ -270,6 +270,7 @@ poetry.toml
 *.txt
 !requirements.txt
 *.yml
+.env_gradio
 
 ## folders
 .vscode/

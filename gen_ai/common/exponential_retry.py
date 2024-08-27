@@ -43,6 +43,7 @@ Exceptions Handled:
 
 import functools
 import time
+from func_timeout import func_timeout, FunctionTimedOut
 
 from google.api_core.exceptions import GoogleAPICallError, InternalServerError
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -144,19 +145,88 @@ def concurrent_best_reduce(num_calls):
             Returns:
                 Tuple[Any, float]: The best result from the concurrent executions (result, score).
             """
-            results: list[tuple[Any, float]] = []
+            results: list[tuple[Any, float, bool]] = []
             with ThreadPoolExecutor(max_workers=num_calls) as executor:
                 futures = [executor.submit(func, *args, **kwargs) for _ in range(num_calls)]
                 for future in as_completed(futures):
-                    results.append(future.result())
+                    try:
+                        result = future.result()
+                        if result[2]:
+                            results.append(result)
+                    except TimeoutError:
+                        print("A function call exceeded the timeout and was skipped.")
+                    except Exception as e: # pylint: disable=W0718
+                        print(f"A function call failed due to an error: {e}")
 
-            print(f"Selecting Best LLM call from {num_calls} calls...")
-            best_result: tuple[Any, float] = max(results, key=lambda x: x[1])
+            if not results:
+                print(f"All {num_calls} attempted calls were unsuccessful")
+                return (
+                    {
+                        "answer": "I was not able to answer this question",
+                        "plan_and_summaries": "",
+                        "context_used": "[]",
+                        "additional_information_to_retrieve": "",
+                    },
+                    0,
+                    False
+                )
+
+            print(f"Selecting the best result from {len(results)} successful calls out of {num_calls} attempted...")
+            best_result: tuple[Any, float, bool] = max(results, key=lambda x: x[1])
             return best_result
 
         return wrapper
 
     return decorator
+
+
+def timeout_llm_call(timeout):
+    """
+    Decorator that enforces a timeout on an LLM call.
+
+    Args:
+        timeout: The maximum time (in seconds) that the LLM call is allowed to run.
+
+    Returns:
+        A decorator function that can be applied to other functions to enforce the timeout.
+    """
+
+    def decorator_timeout(func: Callable[..., tuple[Any, float]]) -> Callable[..., tuple[Any, float]]:
+        """
+        Inner decorator function that applies the timeout to the wrapped function.
+
+        Args:
+            func: The function to be wrapped and have a timeout applied.
+
+        Returns:
+            The wrapped function with timeout enforcement.
+        """
+        def wrapper_timeout(*args: Any, **kwargs: Any) -> tuple[Any, float]:
+            """
+            Wrapper function that actually executes the wrapped function with timeout handling.
+
+            Args:
+                *args: Positional arguments to be passed to the wrapped function.
+                **kwargs: Keyword arguments to be passed to the wrapped function.   
+
+
+            Returns:
+                A tuple containing the output of the wrapped function and the confidence score.
+            """
+            try:
+                return func_timeout(timeout, func, args=args, kwargs=kwargs)
+            except FunctionTimedOut:
+                output = {}
+                print("Crashed because of timeout")
+                output["answer"] = "I was not able to answer this question"
+                output["plan_and_summaries"] = ""
+                output["context_used"] = "[]"
+                output["additional_information_to_retrieve"] = ""
+                return output, 0, False
+
+        return wrapper_timeout
+
+    return decorator_timeout
 
 
 class LLMExponentialRetryWrapper:

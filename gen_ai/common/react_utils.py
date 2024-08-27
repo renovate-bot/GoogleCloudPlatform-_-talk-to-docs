@@ -80,9 +80,9 @@ def get_confidence_score(question: str, answer: str) -> int:
         except Exception as _:  # pylint: disable=W0718
             print("failed to parse confidence score")
             print(f"{answer_scoring_raw}")
-            answer_scoring = {"helpfullness_score": 0}
+            answer_scoring = {"confidence_score": 0}
 
-    confidence = answer_scoring.get("helpfullness_score")
+    confidence = answer_scoring.get("confidence_score")
 
     try:
         confidence = int(confidence)

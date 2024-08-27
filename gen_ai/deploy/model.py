@@ -37,6 +37,26 @@ def transform_to_dictionary(base_model: BaseModel) -> dict:
 
 
 class PersonalizedData(BaseModel):
+    """Represents personalized policy and patient data.
+
+    This class models the personalized information associated with an insurance
+    policy and the patient covered by the policy.
+
+    Attributes:
+        member_id (str): Unique identifier for the policy member.
+        policy_title (str): Title or name of the insurance policy.
+        policy_holder_name (str): Full name of the policyholder.
+        patient_first_name (str): First name of the patient.
+        patient_last_name (str): Last name of the patient.
+        patient_age (int): Age of the patient in years.
+        patient_gender (str): Gender of the patient (e.g., "M", "F", "Other").
+        effective_date (str): Date the policy becomes effective (YYYY-MM-DD).
+        agent_name (str): Name of the insurance agent.
+        set_number (str): A set identifier for the policy.
+        policy_number (str): Unique identifier for the insurance policy.
+        session_id (str): Identifier for the current session or interaction.
+    """
+
     member_id: str = ""
     policy_title: str = ""
     policy_holder_name: str = ""
@@ -49,6 +69,7 @@ class PersonalizedData(BaseModel):
     set_number: str = ""
     policy_number: str = ""
     session_id: str = ""
+    cob_status: str = ""
 
 
 class ItemInput(BaseModel):
@@ -74,6 +95,20 @@ class ResetInput(BaseModel):
 
 class ResetOutput(BaseModel):
     success: bool
+
+
+class VAISConfig(BaseModel):
+    branch: str = "default_branch"
+    bucket_name: str
+    collection: str = "default_collection"
+    company_name: str
+    data_store_id: str
+    dataset_name: str
+    engine_id: str
+    location: str
+    metadata_filename: str
+    metadata_folder: str
+    source_folder: str
 
 
 class LLMOutput(BaseModel):
@@ -162,6 +197,7 @@ class QueryState:
         time_taken: The time taken to generate the answer.
         confidence_score: Confidence score of the answer of the final round
         custom_fields: Dictionary from list of dictionaries, that represents information specific to use case
+        original_question: Original question before enhancements
     """
 
     question: str
@@ -179,6 +215,7 @@ class QueryState:
     time_taken: int = field(default=0)
     confidence_score: int = field(default=0)
     custom_fields: dict[str, list[dict[str, str]]] = field(default_factory=dict)
+    original_question: str | None = field(default=None)
 
 
 @dataclass
