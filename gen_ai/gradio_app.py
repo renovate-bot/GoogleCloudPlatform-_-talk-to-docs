@@ -60,7 +60,7 @@ def predict(conversation: Conversation, input_query, input_metadata, request: gr
     conversation.exchanges.append(query_state)
 
     if input_metadata:
-        input_metadata = {"set_number": input_metadata.lower()}
+        input_metadata = {"set_number": input_metadata.lower(), "member_id": "m123"}
     else:
         input_metadata = None
     llm.respond(conversation, input_metadata)
