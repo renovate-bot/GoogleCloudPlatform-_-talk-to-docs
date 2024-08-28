@@ -10,6 +10,11 @@ variable "global_lb_domain" {
   default     = null
 }
 
+variable "iap_service_agent_member" {
+  description = "The IAP Service Agent in the form 'serviceAccount:{email_address}."
+  type        = string
+}
+
 variable "backend_services" {
   type = list(object({
     paths               = list(string)

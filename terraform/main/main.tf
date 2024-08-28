@@ -3,6 +3,11 @@ locals {
   global_lb_domain = coalesce(var.global_lb_domain, try(module.loadbalancer.global_lb_domain, null))
 }
 
+resource "google_project_service_identity" "iap_sa" {
+  provider = google-beta
+  service  = "iap.googleapis.com"
+}
+
 module "vpc" {
   source           = "../modules/vpc"
   vpc_network_name = var.vpc_network_name
@@ -13,9 +18,10 @@ module "vpc" {
 }
 
 module "loadbalancer" {
-  source           = "../modules/loadbalancer"
-  project_id       = var.project_id
-  global_lb_domain = var.global_lb_domain
+  source                   = "../modules/loadbalancer"
+  project_id               = var.project_id
+  global_lb_domain         = var.global_lb_domain
+  iap_service_agent_member = google_project_service_identity.iap_sa.member
 
   backend_services = [
     {
@@ -36,11 +42,6 @@ module "t2x" {
   t2x_dataset_name    = local.config.dataset_name
   redis_instance_name = local.config.terraform_redis_name
   global_lb_domain    = local.global_lb_domain
-}
-
-resource "google_project_service_identity" "iap_sa" {
-  provider = google-beta
-  service  = "iap.googleapis.com"
 }
 
 module "cloud_run_api" {

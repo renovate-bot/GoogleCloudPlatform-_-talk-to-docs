@@ -68,17 +68,13 @@ resource "google_storage_managed_folder" "folder" {
   name   = "site/"
 }
 
-# # Create a public viewer IAM member for the default backend bucket managed folder.
-# # Projects enforcing policy constraints allowing IAM members only from
-# # authorized domains will fail to create this resource.
-# # Omit this resource to prevent the constraint from failing the deployment.
-# # Requests reaching the default bucket will return a 403 error in that case.
-# resource "google_storage_managed_folder_iam_member" "public_viewer" {
-#   bucket         = google_storage_managed_folder.folder.bucket
-#   managed_folder = google_storage_managed_folder.folder.name
-#   role           = "roles/storage.objectViewer"
-#   member         = "allUsers"
-# }
+# Provide the Identity-Aware Proxy (IAP) service agent view access.
+resource "google_storage_managed_folder_iam_member" "iap_service_agent" {
+  bucket         = google_storage_managed_folder.folder.bucket
+  managed_folder = google_storage_managed_folder.folder.name
+  role           = "roles/storage.objectViewer"
+  member         = var.iap_service_agent_member
+}
 
 resource "google_storage_bucket_object" "index" {
   name         = "${google_storage_managed_folder.folder.name}index.html"
