@@ -245,6 +245,9 @@ cd $REPO_ROOT
 gcloud builds submit . --config=cloudbuild.yaml --project=$PROJECT --region=$REGION --substitutions="_RUN_TYPE=apply" --impersonate-service-account=terraform-service-account@${PROJECT}.iam.gserviceaccount.com
 ```
 
+- Submit a new build using the same command after any changes to the application source to automatically build and deploy the updated Docker images to Cloud Run.
+- Review the build logs in the [Cloud Build History](https://cloud.google.com/build/docs/view-build-results) to verify the build and deployment status.
+
 
 &nbsp;
 # Add an A record to the DNS Managed Zone
