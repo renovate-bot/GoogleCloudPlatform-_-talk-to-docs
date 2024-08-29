@@ -128,7 +128,7 @@ alias tf='terraform'
 
 - Your user account (`core.account`) and default project (`core.project`) should already be set up in the Cloud Shell environment. To confirm:
 ```sh
-gcloud config list --format-yaml
+gcloud config list --format=yaml
 ```
 
 - [OPTIONAL] Set the default compute region (`compute.region`). The helper script will default to 'us-central1' if your `gcloud` configuration does not specify a region.
