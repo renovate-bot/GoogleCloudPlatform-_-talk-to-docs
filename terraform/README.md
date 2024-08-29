@@ -117,6 +117,7 @@ terraform/ # this directory
 ```sh
 chmod +x terraform/scripts/bootstrap.sh # change the path if necessary
 chmod +x terraform/scripts/set_variables.sh # change the path if necessary
+chmod +x terraform/scripts/test_endpoint.sh # change the path if necessary
 ```
 
 - **Commands in this repository assume `tf` is an [alias](https://www.man7.org/linux/man-pages/man1/alias.1p.html) for `terraform` in your shell.**
@@ -268,6 +269,11 @@ gcloud builds submit . --config=cloudbuild.yaml --project=$PROJECT --region=$REG
 - Submit a new build using the same command after any changes to the application source to automatically build and deploy the updated Docker images to Cloud Run.
 - Review the build logs in the [Cloud Build History](https://cloud.google.com/build/docs/view-build-results) to verify the build and deployment status.
 
+### Building the Docker images and applying the Terraform configuration will take some time.
+- Docker builds & pushes take ~5 minutes and must complete before Cloud Build uses Terraform to provisions resources.
+- First time Terraform provisioning of all resources takes ~7-10 minutes (Memorystore Redis will take ~5+ minutes individually).
+- Subsequent Terraform runs deploying only updated Cloud Run services take ~1.5 minutes (after the Docker images are built and pushed).
+
 
 &nbsp;
 # Add an A record to the DNS Managed Zone
@@ -285,17 +291,16 @@ gcloud builds submit . --config=cloudbuild.yaml --project=$PROJECT --region=$REG
 # Test the endpoint
 ([return to top](#talk-to-docs-application-deployment-with-terraform))
 
-- Verify the TLS certificate is active and the endpoint is reachable using `curl`.
+- Verify the TLS certificate is active and the endpoint is reachable using the `test_endpoint.sh` helper script.
 - *It may take some more time after the certificate reaches ACTIVE Managed status before the endpoint responds with success. It may throw an SSLError due to mismatched client and server protocols until changes propagate.*
 - [Authenticate](https://cloud.google.com/run/docs/authenticating/service-to-service) using a service account and the [Cloud Run custom audience](https://cloud.google.com/run/docs/configuring/custom-audiences) to generate an ID token.
 - The service account must have the `roles/run.invoker` role on the Cloud Run service.
+    - The [Terraform provisioning service account](#least-privilege-service-account-roles) has sufficient permissions to invoke the Cloud Run service.
+    - You can optionally [add a service account email address](#2-optional-configure-optional-input-variable-values-in-terraformmainvarsautotfvars) to the `cloud_run_invoker_service_account` input variable in `terraform/main/vars.auto.tfvars` to grant the `roles/run.invoker` role on the Cloud Run services.
 - The server responds with a 200 status code and `{"status":"ok"}` if the endpoint is reachable and the TLS certificate is active.
-- [OPTIONAL] Consider skipping to the [Stage document extractions](#stage-document-extractions) step first then return here to test the endpoint while waiting for DNS propagation.
+- [OPTIONAL] Consider skipping to the [Stage document extractions](#stage-document-extractions) step first then return here to test the endpoint after allowing time for DNS propagation.
 ```sh
-export AUDIENCE='https://34.54.24.62.nip.io/t2x-api' # replace with the Cloud Run Custom Audience (uses load balancer domain or nip.io domain plus the Cloud Run service name as the '/path') - will be displayed in Terraform main module outputs as 'custom_audience'.
-export RUN_INVOKER_SERVICE_ACCOUNT='run-invoker-service-account@my-project-id.iam.gserviceaccount.com' # replace with the run invoker service account email address
-export TOKEN=$(gcloud auth print-identity-token --impersonate-service-account=$RUN_INVOKER_SERVICE_ACCOUNT --audiences=$AUDIENCE)
-curl -X GET -H "Authorization: Bearer ${TOKEN}" "${AUDIENCE}/health"
+./terraform/scripts/test_endpoint.sh
 ```
 
 
