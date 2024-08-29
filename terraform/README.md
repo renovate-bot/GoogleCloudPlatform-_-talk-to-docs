@@ -111,22 +111,8 @@ terraform/ # this directory
 # Prerequisites
 ([return to top](#talk-to-docs-application-deployment-with-terraform))
 
-- Install the [Google Cloud SDK](https://cloud.google.com/sdk/docs/install).
-- Authenticate as the **[Project Owner](https://cloud.google.com/iam/docs/understanding-roles#owner)**.
-```sh
-gcloud auth login
-```
-
-- Set the default project.
-```sh
-gcloud config set project 'my-project-id' # replace with your project ID
-```
-
-- Set the default region.
-```sh
-gcloud config set compute/region us-central1 # replace with your preferred region
-```
-
+- [Clone the repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) and open a terminal session in the local repo directory.
+- Your Google user account must be a **[Project Owner](https://cloud.google.com/iam/docs/understanding-roles#owner)** in the target project.
 - Make the helper scripts executable.
 ```sh
 chmod +x terraform/scripts/bootstrap.sh # change the path if necessary
@@ -137,6 +123,40 @@ chmod +x terraform/scripts/set_variables.sh # change the path if necessary
 ```sh
 alias tf='terraform'
 ```
+
+### OPTION 1: Deploying from [Google Cloud Shell](https://cloud.google.com/shell/docs/using-cloud-shell):
+
+- Your user account (`core.account`) and default project (`core.project`) should already be set up in the Cloud Shell environment. To confirm:
+```sh
+gcloud config list --format-yaml
+```
+
+- [OPTIONAL] Set the default compute region (`compute.region`). The helper script will default to 'us-central1' if your `gcloud` configuration does not specify a region.
+```sh
+gcloud config set compute/region 'region' # replace with your preferred region if it's not 'us-central1'
+```
+
+- Continue to the [Bootstrap](#bootstrap) step.
+
+### OPTION 2: Deploying outside of Google Cloud Shell:
+- Install [Terraform](https://learn.hashicorp.com/tutorials/terraform/install-cli).
+- Install the [Google Cloud SDK](https://cloud.google.com/sdk/docs/install).
+- Authenticate.
+```sh
+gcloud auth login
+```
+
+- Set the default project.
+```sh
+gcloud config set project 'my-project-id' # replace with your project ID
+```
+
+- [OPTIONAL] Set the default compute region (`compute.region`). The helper script will default to 'us-central1' if your `gcloud` configuration does not specify a region.
+```sh
+gcloud config set compute/region 'region' # replace with your preferred region if it's not 'us-central1'
+```
+
+- Continue to the [Bootstrap](#bootstrap) step.
 
 
 &nbsp;

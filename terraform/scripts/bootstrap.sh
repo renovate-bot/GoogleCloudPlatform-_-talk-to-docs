@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# The user completes these prerequisite commmands:
+# The user completes these prerequisite commmands (Google Cloud Shell sets them up automatically):
 # gcloud auth login
-# gcloud config set project {my-project-id} # Replace {my-project-id} with your project ID.
-# gcloud config set compute/region us-central1
+# gcloud config set project 'my-project-id' # replace 'my-project-id' with your project ID
+# [OPTIONAL] gcloud config set compute/region us-central1
 
 # Determine the directory of the script
 if [ -n "$BASH_SOURCE" ]; then
@@ -17,7 +17,7 @@ else
   SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 fi
 
-# Set environment variables.
+# Set environment variables by sourcing the set_variables script.
 echo "Setting environment variables..."
 echo ""
 source "$SCRIPT_DIR/set_variables.sh"
