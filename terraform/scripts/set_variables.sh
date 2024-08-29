@@ -7,7 +7,14 @@
 
 # Set the PROJECT and REGION variables.
 export PROJECT=$(gcloud config list --format='value(core.project)')
-export REGION=$(gcloud config list --format='value(compute.region)')
+region=$(gcloud config list --format='value(compute.region)')
+
+# Set the REGION variable to us-central1 if it is unset.
+if [ -z "$region" ]; then
+  export REGION="us-central1"
+else
+  export REGION=$region
+fi
 
 # Set the project_id and terraform_service_account input variables for Terraform.
 export TF_VAR_project_id=$PROJECT
