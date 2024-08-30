@@ -118,6 +118,7 @@ terraform/ # this directory
 chmod +x terraform/scripts/bootstrap.sh # change the path if necessary
 chmod +x terraform/scripts/set_variables.sh # change the path if necessary
 chmod +x terraform/scripts/test_endpoint.sh # change the path if necessary
+chmod +x terraform/scripts/trigger_workflow.sh # change the path if necessary
 ```
 
 - **Commands in this repository assume `tf` is an [alias](https://www.man7.org/linux/man-pages/man1/alias.1p.html) for `terraform` in your shell.**
@@ -200,7 +201,7 @@ Applying the resources from the `bootstrap` module is a one-time setup for a new
 
 1. Source the `set_variables.sh` script to configure the shell environment (provides variables including `PROJECT` and `REPO_ROOT`).
 ```sh
-source ./terraform/scripts/set_variables.sh
+source ./terraform/scripts/set_variables.sh # change the path if necessary
 ```
 
 2. Initialize the Terraform `bootstrap` module using a [partial backend configuration](https://developer.hashicorp.com/terraform/language/settings/backends/configuration#partial-configuration).
@@ -236,13 +237,7 @@ Use the [`gcloud CLI`](https://cloud.google.com/build/docs/running-builds/submit
 - `global_lb_domain` - the domain name you want to use for the Cloud Load Balancer front end. You need control of the DNS zone to [edit the A record](#add-an-a-record-to-the-dns-managed-zone). If left unset, Terraform will default to using [nip.io](https://nip.io) with the load balancer IP address.
 - `cloud_run_invoker_service_account` - the email address of a service account to grant the `roles/run.invoker` role on the Cloud Run services. It can be any service account you can use to [generate ID tokens](https://cloud.google.com/docs/authentication/get-id-token#impersonation). If left unset, Terraform won't add any additional principal to the Cloud Run services.
 
-## 3. Set environment variables
-- Use the `set_variables.sh` script to configure the shell environment.
-```sh
-source ./terraform/scripts/set_variables.sh # change the path if necessary
-```
-
-## 4. Create a `.env_gradio` file.
+## 3. Create a `.env_gradio` file.
 - Set the gradio app username and password using a local file that [python-dotenv](https://pypi.org/project/python-dotenv/) will read when the app launches.
 - The `.env_gradio` file is specifically excluded from the repo by `.gitignore` but included in the files sent to Cloud Build using a filename pattern in `.gcloudignore`.
 - The file must be in the repo root directory.
@@ -256,6 +251,12 @@ cat << EOF > .env_gradio
 gradio_user=$user
 gradio_password=$password
 EOF
+```
+
+## 4. Set environment variables
+- Use the `set_variables.sh` script to configure the shell environment.
+```sh
+source ./terraform/scripts/set_variables.sh # change the path if necessary
 ```
 
 ## 5. Build & push the docker images and apply the Terraform configuration
@@ -300,7 +301,7 @@ gcloud builds submit . --config=cloudbuild.yaml --project=$PROJECT --region=$REG
 - The server responds with a 200 status code and `{"status":"ok"}` if the endpoint is reachable and the TLS certificate is active.
 - [OPTIONAL] Consider skipping to the [Stage document extractions](#stage-document-extractions) step first then return here to test the endpoint after allowing time for DNS propagation.
 ```sh
-./terraform/scripts/test_endpoint.sh
+./terraform/scripts/test_endpoint.sh # change the path if necessary
 ```
 
 
@@ -377,19 +378,39 @@ gcloud storage cp -r "gs://$SOURCE_BUCKET/$DATASET_NAME/*" "gs://$STAGING_BUCKET
 ![Staging bucket structure](assets/extractions_metadata_jsonl.png)
 
 ## 1. Trigger the workflow
-- Use the [Cloud Console](https://cloud.google.com/workflows/docs/executing-workflow#console) or the `gcloud` CLI with the `workflows executions create` command.
+- Use the [Cloud Console](https://cloud.google.com/workflows/docs/executing-workflow#console) or the `trigger_workflow.sh` helper script.
 - **Pass the required [runtime argument](https://cloud.google.com/workflows/docs/passing-runtime-arguments) `dataset_name` to the workflow.**
-- `gcloud` CLI example:
+- `trigger_workflow.sh` CLI example:
 ```sh
-export PROJECT='my-project-id' # replace with your project ID
-export REGION='us-central1'
-export DATASET_NAME='{source_extractions_folder_path}' # replace with the source extractions folder path
-# i.e. with the full source path URI as 'gs://source-extractions-bucket/extractions20240715' -> 'extractions20240715'
+./terraform/scripts/trigger_workflow.sh # change the path if necessary
+```
+example output:
+```
+uesr@cloudshell:~/talk-to-docs (argo-genai-sa)$ ./terraform/scripts/trigger_workflow.sh
+Setting environment variables...
 
-# [OPTIONAL] Use impersonation if your user account does not have the required permission to execute the workflow.
-export WORKFLOW_INVOKER_SERVICE_ACCOUNT="my-service-account@${PROJECT}.iam.gserviceaccount.com" # use any service account with permission to invoke and get workflow executions (https://cloud.google.com/workflows/docs/access-control#roles) that you can impersonate (requires the caller to have the roles/iam.serviceAccountTokenCreator role on the service account)
+WARNING: Property validation for compute/region was skipped.
+Updated property [compute/region].
 
-gcloud workflows execute t2x-doc-ingestion-workflow --project=$PROJECT --location=$REGION --data="{\"dataset_name\":\"$DATASET_NAME\"}" --impersonate-service-account=$WORKFLOW_INVOKER_SERVICE_ACCOUNT
+PROJECT: argo-genai-sa
+REGION: us-central1
+TF_VAR_project_id: argo-genai-sa
+TF_VAR_terraform_service_account: terraform-service-account@argo-genai-sa.iam.gserviceaccount.com
+REPO_ROOT: /home/user/talk-to-docs
+
+Enter the name of the folder in the staging bucket containing
+the extractions to import to the Agent Builder Data Store.
+It will be located under the 'source-data' top-level folder.
+
+dataset_name: 
+extractions20240821
+
+WARNING: This command is using service account impersonation. All API calls will be executed as [terraform-service-account@argo-genai-sa.iam.gserviceaccount.com].
+WARNING: This command is using service account impersonation. All API calls will be executed as [terraform-service-account@argo-genai-sa.iam.gserviceaccount.com].
+Created [ff62fee3-9d49-40f0-b5dd-57c2a9f84384].
+
+To view the workflow status, you can use following command:
+gcloud workflows executions describe ff62fee3-9d49-40f0-b5dd-57c2a9f84384 --workflow t2x-doc-ingestion-workflow --location us-central1
 ```
 
 ## 2. Check the progress
@@ -399,6 +420,28 @@ gcloud workflows execute t2x-doc-ingestion-workflow --project=$PROJECT --locatio
 gcloud workflows executions wait-last
 ```
 - The workflow returns all metadata about the import operation when it completes.
+```
+user@cloudshell:~/talk-to-docs (argo-genai-sa)$ gcloud workflows executions wait-last
+Using cached execution name: projects/453639229965/locations/us-central1/workflows/t2x-doc-ingestion-workflow/executions/ff62fee3-9d49-40f0-b5dd-57c2a9f84384
+Waiting for execution [ff62fee3-9d49-40f0-b5dd-57c2a9f84384] to complete...done.                                                                    
+argument: '{"dataset_name":"extractions20240821"}'
+createTime: '2024-08-29T23:27:00.162693944Z'
+duration: 362.133843868s
+endTime: '2024-08-29T23:33:02.296537812Z'
+labels:
+  goog-terraform-provisioned: 'true'
+name: projects/453639229965/locations/us-central1/workflows/t2x-doc-ingestion-workflow/executions/ff62fee3-9d49-40f0-b5dd-57c2a9f84384
+result: '{"body":{"done":true,"metadata":{"@type":"type.googleapis.com/google.cloud.discoveryengine.v1alpha.ImportDocumentsMetadata","create_time":"2024-08-29T23:27:10.510189Z","failure_count":"0","success_count":"513","total_count":"513","update_time":"2024-08-29T23:32:42.852553Z"},"name":"projects/453639229965/locations/us/collections/default_collection/dataStores/data-store-test/branches/0/operations/import-documents-5755255138805193551","response":{"@type":"type.googleapis.com/google.cloud.discoveryengine.v1alpha.ImportDocumentsResponse","error_config":{"gcs_prefix":"gs://453639229965_us_import_document/errors5755255138805194029"},"error_samples":[]}},"code":200,"headers":{"Alt-Svc":"h3=\":443\";
+  ma=2592000,h3-29=\":443\"; ma=2592000","Content-Length":"646","Content-Type":"application/json","Date":"Thu,
+  29 Aug 2024 23:33:02 GMT","Server":"Google Frontend","Via":"1.1 google","X-Cloud-Trace-Context":"fb0d5113d428b96d69d90b94b88c490e;o=1"}}'
+startTime: '2024-08-29T23:27:00.162693944Z'
+state: SUCCEEDED
+status:
+  currentSteps:
+  - routine: main
+    step: return_results
+workflowRevisionId: 000001-c99
+```
 
 
 &nbsp;
