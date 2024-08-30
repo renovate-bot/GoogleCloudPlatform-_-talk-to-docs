@@ -36,12 +36,14 @@ module "loadbalancer" {
 }
 
 module "t2x" {
-  source              = "../modules/t2x-module"
-  project_id          = var.project_id
-  vpc_network_id      = module.vpc.vpc_network_id
-  t2x_dataset_name    = local.config.dataset_name
-  redis_instance_name = local.config.terraform_redis_name
-  global_lb_domain    = local.global_lb_domain
+  source                = "../modules/t2x-module"
+  project_id            = var.project_id
+  vpc_network_id        = module.vpc.vpc_network_id
+  vpc_subnet_id         = module.vpc.vpc_subnet_id
+  compute_instance_name = local.config.terraform_instance_name
+  t2x_dataset_name      = local.config.dataset_name
+  redis_instance_name   = local.config.terraform_redis_name
+  global_lb_domain      = local.global_lb_domain
 }
 
 module "cloud_run_api" {

@@ -73,6 +73,17 @@ output "redis_dns_name" {
 
 }
 
+output "compute_instance_name" {
+  description = "The name of the Compute Engine instance."
+  value       = module.t2x.compute_instance_name
+}
+
+output "compute_instance_id" {
+  description = "The number of the Compute Engine instance."
+  value       = module.t2x.compute_instance_id
+
+}
+
 output "data_store_id" {
   description = "The ID of the Agent Builder data store."
   value       = module.discovery_engine.data_store_id

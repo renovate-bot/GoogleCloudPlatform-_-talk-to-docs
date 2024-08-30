@@ -8,6 +8,16 @@ variable "vpc_network_id" {
   description = "The VPC network ID."
 }
 
+variable "vpc_subnet_id" {
+  type        = string
+  description = "The VPC subnet ID."
+}
+
+variable "compute_instance_name" {
+  description = "The name of the Compute Engine instance."
+  type        = string
+}
+
 variable "t2x_dataset_name" {
   description = "The name of the BigQuery dataset."
   type        = string

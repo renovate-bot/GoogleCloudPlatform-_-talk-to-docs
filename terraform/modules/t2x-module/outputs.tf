@@ -27,3 +27,14 @@ output "redis_dns_name" {
   description = "The DNS name of the Redis instance."
   value       = google_dns_record_set.redis.name
 }
+
+output "compute_instance_name" {
+  description = "The name of the Compute Engine instance."
+  value       = var.compute_instance_name
+}
+
+output "compute_instance_id" {
+  description = "The number of the Compute Engine instance."
+  value       = google_compute_instance.dev_instance.instance_id
+
+}
