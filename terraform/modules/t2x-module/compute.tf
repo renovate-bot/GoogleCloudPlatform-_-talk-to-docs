@@ -11,9 +11,6 @@ resource "google_compute_instance" "dev_instance" {
     }
     mode = "READ_WRITE"
   }
-  labels = {
-    app = "t2x"
-  }
   metadata = {
     startup-script = file("${path.module}/startup.sh")
   }
@@ -39,5 +36,4 @@ resource "google_compute_instance" "dev_instance" {
     enable_secure_boot          = true
     enable_vtpm                 = true
   }
-  tags = ["t2x-app"]
 }

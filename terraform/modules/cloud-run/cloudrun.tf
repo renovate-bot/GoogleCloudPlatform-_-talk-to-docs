@@ -1,8 +1,9 @@
 resource "google_cloud_run_v2_service" "t2x" {
-  name         = var.service_name
-  location     = var.region
-  launch_stage = "GA"
-  ingress      = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+  name                = var.service_name
+  location            = var.region
+  deletion_protection = false
+  launch_stage        = "GA"
+  ingress             = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
   custom_audiences = [
     "https://${var.global_lb_domain}/${var.service_name}",
   ]
@@ -57,7 +58,7 @@ resource "google_cloud_run_service_iam_member" "t2x_data_mover_invoker" {
 }
 
 # Allow the IAP Service Agent to invoke the Cloud Run service.
-resource "google_cloud_run_service_iam_member" "iap_sa" {
+resource "google_cloud_run_service_iam_member" "iap_sa_invoker" {
   service = google_cloud_run_v2_service.t2x.name
   role    = "roles/run.invoker"
   member  = var.iap_service_agent_member

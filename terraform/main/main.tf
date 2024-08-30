@@ -18,21 +18,19 @@ module "vpc" {
 }
 
 module "loadbalancer" {
-  source                   = "../modules/loadbalancer"
-  project_id               = var.project_id
-  global_lb_domain         = var.global_lb_domain
-  iap_service_agent_member = google_project_service_identity.iap_sa.member
-
-  backend_services = [
-    {
+  source           = "../modules/loadbalancer"
+  project_id       = var.project_id
+  global_lb_domain = var.global_lb_domain
+  backend_services = {
+    t2x-api = {
       paths   = ["/t2x-api/*"]
       service = module.cloud_run_api.cloudrun_backend_service_id
     },
-    {
+    t2x-ui = {
       paths   = ["/t2x-ui/*"]
       service = module.cloud_run_ui.cloudrun_backend_service_id
     }
-  ]
+  }
 }
 
 module "t2x" {

@@ -477,10 +477,10 @@ workflowRevisionId: 000001-c99
 
 ![OAuth Consent Screen configuration](assets/enable_iap.png)
 
-12. Add a Google Identity (i.e a user or group) with the "IAP-secured Web App User" role.  
-13. You may see an "Error: Forbidden" message for about the first 5 minutes, but after that users with the "IAP-secured Web App User" role on the Project or IAP backend service should be able to access the app via the domain on the Load Balancer certificate plus the service path.
-    - i.e. `https://app.example.com/t2x-ui/` or `https://35.244.148.105.nip.io/t2x-ui/`
-    - The load balancer path requires a trailing slash `/`.
+12. Add a Google Identity (i.e a user or group) with the "IAP-secured Web App User" role.
+    - See the [Known Issues](#errors-adding-users-to-identity-aware-proxy) section for information about "Policy updated failed" errors due to the [Domain restricted sharing Org policy](https://cloud.google.com/resource-manager/docs/organization-policy/restricting-domains#example_error_message).
+13. You may see an "Error: Forbidden" message for about the first 5 minutes, but after that users with the "IAP-secured Web App User" role on the Project or IAP backend service should be able to access the app via the domain on the Load Balancer certificate.
+    - i.e. `https://app.example.com` or `https://35.244.148.105.nip.io`
 
 
 &nbsp;
@@ -829,7 +829,19 @@ tf apply -var-file="vars_$ENVIRONMENT.tfvars"
 # Known issues
 ([return to top](#talk-to-docs-application-deployment-with-terraform))
 
-The Terraform Google provider sometimes returns an inconsistent plan during `apply` operations. You can usually ignore the error messages because the resources get successfully created or updated.
+## Errors adding users to Identity-Aware Proxy
+### Problem
+When [adding members to the IAP-secured backend service](#configure-identity-aware-proxy), a [Domain restricted sharing Org policy](https://cloud.google.com/resource-manager/docs/organization-policy/restricting-domains) causes an error message like this:\
+![Policy update failed](assets/drs_error.png)\
+
+### Solution
+1. [Edit the policy](https://cloud.google.com/resource-manager/docs/organization-policy/creating-managing-policies#creating_and_editing_policies) to temporarily disable it.
+2. Add the members to IAP-protected backend service IAM policy.
+3. Re-enable the policy.
+
+## Inconsistent Terraform plan
+### Problem
+The Terraform Google provider sometimes returns an inconsistent plan during `apply` operations.
 
 Example:
 ```
@@ -844,7 +856,12 @@ Example:
 │ This is a bug in the provider, which should be reported in the provider's own issue tracker.
 ```
 
-Intermittent connectivity issues (for example, while using a VPN) can cause unresponsiveness during `plan` or `apply` operations. Retry the operation to clear the error.
+### Solution
+You can usually ignore the error messages because the resources get successfully created or updated. If the error persists, try running `terraform apply` again or refer to the provider's documentation.
+
+## Errors reading or editing Terraform resources
+### Problem
+Intermittent connectivity issues (for example, while using a VPN) can cause unresponsiveness during `plan` or `apply` operations.
 
 Example:
 ```
@@ -856,3 +873,6 @@ Example:
 │ 
 ╵
 ```
+
+### Solution
+Retry the operation to clear the error. If the error persists, check your network or VPN connection and try again.
