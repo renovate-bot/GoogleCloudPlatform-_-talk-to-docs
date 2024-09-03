@@ -23,7 +23,7 @@ echo ""
 AUDIENCE=$(
 cd $REPO_ROOT/terraform/main
 terraform init -backend-config="bucket=terraform-state-${PROJECT}" -backend-config="impersonate_service_account=$TF_VAR_terraform_service_account" > /dev/null 2>&1
-terraform output -raw custom_audience
+terraform output -raw custom_audience_api
 )
 echo "AUDIENCE: $AUDIENCE"
 echo ""

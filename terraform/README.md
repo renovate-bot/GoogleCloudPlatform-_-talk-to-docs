@@ -72,8 +72,8 @@ Terraform modules to stage and deploy the application components. The `bootstrap
 ```sh
 terraform/ # this directory
 ├── README.md # this file
-├── assets/ # architecture diagrams
-├── bootstrap/ # provision project APIs, Cloud Build service account, IAM roles, and staging bucket
+├── assets/ # diagrams and screenshots
+├── bootstrap/ # provision resources required for the main module
 ├── main/ # provision the talk-to-docs service components
 ├── modules/ # reusable Terraform modules called from the `main` module
 └── scripts/ # helper scripts for deployment
@@ -83,28 +83,21 @@ terraform/ # this directory
 # Deployment steps
 ([return to top](#talk-to-docs-application-deployment-with-terraform))
 
-1. Complete the [prerequisite steps](#prerequisites).
-2. Bootstrap the project with gcloud and Terraform.
+1. Complete the [prerequisites](#prerequisites).
+2. [Bootstrap](#bootstrap) the project with gcloud and Terraform.
     - Enable APIs.
     - Create service accounts with required IAM roles.
     - Configure service account impersonation.
     - Create remote Terraform state and document staging buckets.
     - Create an Artifact Registry repository.
-3. Automate the deployment with Cloud Build.
+3. [Automate the deployment with Cloud Build](#automate-deployments-with-cloud-build).
     - Build a Docker image.
     - Push the Docker image to Artifact Registry.
     - Apply the Terraform configuration to deploy the T2X application components.
-        - Cloud Run hosts the application using the Docker image from Artifact Registry.
-        - Agent Builder Data Store and Search engine for [RAG](https://cloud.google.com/use-cases/retrieval-augmented-generation?hl=en).
-        - Memorystore Redis for session management.
-        - BigQuery for log data storage.
-        - Cloud Load Balancer for HTTPS traffic routing and TLS encryption.
-        - DNS Managed Zone for private DNS resolution.
-        - VPC network and subnet for private communication between Cloud Run and Memorystore Redis.
-4. Configure DNS and test the talk-to-docs endpoint.
-5. Stage document extractions.
-6. Import document extractions to the Discovery Engine Data Store using Cloud Workflows.
-7. Configure Identity-Aware Proxy for talk-to-docs UI (gradio) Cloud Run services.
+4. [Configure DNS](#add-an-a-record-to-the-dns-managed-zone) and [test the talk-to-docs endpoint](#test-the-endpoint).
+5. [Stage document extractions](#stage-document-extractions).
+6. [Import document extractions](#prepare-the-discovery-engine-data-store-using-cloud-workflows) to the Discovery Engine Data Store using Cloud Workflows.
+7. [Configure Identity-Aware Proxy](#configure-identity-aware-proxy) for talk-to-docs UI (gradio) Cloud Run services.
 
 
 &nbsp;
@@ -128,14 +121,46 @@ alias tf='terraform'
 
 ### OPTION 1: Deploying from [Google Cloud Shell](https://cloud.google.com/shell/docs/using-cloud-shell):
 
-- Your user account (`core.account`) and default project (`core.project`) should already be set up in the Cloud Shell environment. To confirm:
+- Your user account (`core.account`) and default project (`core.project`) should already be set up in the Cloud Shell environment.
+- Confirm your `gcloud` configuration.:
 ```sh
 gcloud config list --format=yaml
+```
+Example output:
+```yaml
+accessibility:
+  screen_reader: 'True'
+component_manager:
+  disable_update_check: 'True'
+compute:
+  gce_metadata_read_timeout_sec: '30'
+core:
+  account: project-owner@example.com
+  disable_usage_reporting: 'False'
+  project: my-project-id
+metrics:
+  environment: devshell
 ```
 
 - [OPTIONAL] Set the default compute region (`compute.region`). The helper script will default to 'us-central1' if your `gcloud` configuration does not specify a region.
 ```sh
 gcloud config set compute/region 'region' # replace with your preferred region if it's not 'us-central1'
+```
+Example output after setting the region to `us-west1`:
+```yaml
+accessibility:
+  screen_reader: 'True'
+component_manager:
+  disable_update_check: 'True'
+compute:
+  gce_metadata_read_timeout_sec: '30'
+  region: us-west1
+core:
+  account: project-owner@example.com
+  disable_usage_reporting: 'False'
+  project: my-project-id
+metrics:
+  environment: devshell
 ```
 
 - Continue to the [Bootstrap](#bootstrap) step.
@@ -233,9 +258,8 @@ Use the [`gcloud CLI`](https://cloud.google.com/build/docs/running-builds/submit
 - `vais_engine_id` - the Agent Builder Search Engine ID (only use `null` during local development to cause the talk-to-docs application to create a new search engine at startup).
 - `vais_location` - the location for discoveryengine API (Agent Builder) resources, one of us, eu, or global
 
-## 2. [OPTIONAL] Configure optional [input variable](https://developer.hashicorp.com/terraform/language/values/variables#assigning-values-to-root-module-variablesvalues) values in `terraform/main/vars.auto.tfvars`.
+## 2. [OPTIONAL] Configure a domain name [input variable](https://developer.hashicorp.com/terraform/language/values/variables#assigning-values-to-root-module-variablesvalues) value in `terraform/main/vars.auto.tfvars`.
 - `global_lb_domain` - the domain name you want to use for the Cloud Load Balancer front end. You need control of the DNS zone to [edit the A record](#add-an-a-record-to-the-dns-managed-zone). If left unset, Terraform will default to using [nip.io](https://nip.io) with the load balancer IP address.
-- `cloud_run_invoker_service_account` - the email address of a service account to grant the `roles/run.invoker` role on the Cloud Run services. It can be any service account you can use to [generate ID tokens](https://cloud.google.com/docs/authentication/get-id-token#impersonation). If left unset, Terraform won't add any additional principal to the Cloud Run services.
 
 ## 3. Create a `.env_gradio` file.
 - Set the gradio app username and password using a local file that [python-dotenv](https://pypi.org/project/python-dotenv/) will read when the app launches.
@@ -293,12 +317,10 @@ gcloud builds submit . --config=cloudbuild.yaml --project=$PROJECT --region=$REG
 ([return to top](#talk-to-docs-application-deployment-with-terraform))
 
 - Verify the TLS certificate is active and the endpoint is reachable using the `test_endpoint.sh` helper script.
-- *It may take some more time after the certificate reaches ACTIVE Managed status before the endpoint responds with success. It may throw an SSLError due to mismatched client and server protocols until changes propagate.*
-- [Authenticate](https://cloud.google.com/run/docs/authenticating/service-to-service) using a service account and the [Cloud Run custom audience](https://cloud.google.com/run/docs/configuring/custom-audiences) to generate an ID token.
-- The service account must have the `roles/run.invoker` role on the Cloud Run service.
-    - The [Terraform provisioning service account](#least-privilege-service-account-roles) has sufficient permissions to invoke the Cloud Run service.
-    - You can optionally [add a service account email address](#2-optional-configure-optional-input-variable-values-in-terraformmainvarsautotfvars) to the `cloud_run_invoker_service_account` input variable in `terraform/main/vars.auto.tfvars` to grant the `roles/run.invoker` role on the Cloud Run services.
+    - The script [authenticates](https://cloud.google.com/run/docs/authenticating/service-to-service) using a service account and the [Cloud Run custom audience](https://cloud.google.com/run/docs/configuring/custom-audiences) to [generate an ID token](https://cloud.google.com/docs/authentication/get-id-token#impersonation)
 - The server responds with a 200 status code and `{"status":"ok"}` if the endpoint is reachable and the TLS certificate is active.
+- *It may take some more time after the certificate reaches ACTIVE Managed status before the endpoint responds with success. It may throw an SSLError due to mismatched client and server protocols until changes propagate.*
+    - Example error: `curl: (35) LibreSSL/3.3.6: error:1404B410:SSL routines:ST_CONNECT:sslv3 alert handshake failure`
 - [OPTIONAL] Consider skipping to the [Stage document extractions](#stage-document-extractions) step first then return here to test the endpoint after allowing time for DNS propagation.
 ```sh
 ./terraform/scripts/test_endpoint.sh # change the path if necessary
@@ -386,7 +408,7 @@ gcloud storage cp -r "gs://$SOURCE_BUCKET/$DATASET_NAME/*" "gs://$STAGING_BUCKET
 ```
 example output:
 ```
-uesr@cloudshell:~/talk-to-docs (argo-genai-sa)$ ./terraform/scripts/trigger_workflow.sh
+user@cloudshell:~/talk-to-docs (argo-genai-sa)$ ./terraform/scripts/trigger_workflow.sh
 Setting environment variables...
 
 WARNING: Property validation for compute/region was skipped.

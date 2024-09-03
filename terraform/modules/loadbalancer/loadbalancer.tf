@@ -51,7 +51,7 @@ resource "google_compute_managed_ssl_certificate" "cert" {
 # URL Map.
 resource "google_compute_url_map" "t2x_lb_url_map" {
   name            = "t2x-lb-url-map"
-  default_service = var.backend_services.t2x-ui.service
+  default_service = var.default_service
 
   host_rule {
     hosts        = [local.t2x_lb_domain]
@@ -59,7 +59,7 @@ resource "google_compute_url_map" "t2x_lb_url_map" {
   }
 
   path_matcher {
-    default_service = var.backend_services.t2x-ui.service
+    default_service = var.default_service
     name            = "t2x-path-matcher"
 
     dynamic "path_rule" {

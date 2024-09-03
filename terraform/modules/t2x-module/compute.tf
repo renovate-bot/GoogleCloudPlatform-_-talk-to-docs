@@ -28,7 +28,7 @@ resource "google_compute_instance" "dev_instance" {
     provisioning_model  = "STANDARD"
   }
   service_account {
-    email  = google_service_account.t2x_service_account.email
+    email  = var.service_account
     scopes = ["https://www.googleapis.com/auth/cloud-platform"]
   }
   shielded_instance_config {
