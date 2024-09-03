@@ -127,3 +127,13 @@ output "doc_ingestion_workflow_service_account" {
   description = "The document ingestion Workflow service account email address."
   value       = module.iam.workflow_service_account_email
 }
+
+output "doc_ingestion_workflow_update_time" {
+  description = "The timestamp of when the workflow was last updated."
+  value       = module.workflow.doc_ingestion_workflow_update_time
+}
+
+output "doc_ingestion_workflow_env_vars" {
+  description = "The document ingestion workflow environment variables."
+  value       = module.workflow.doc_ingestion_workflow_env_vars
+}
