@@ -55,9 +55,13 @@ variable "global_lb_domain" {
 variable "docker_image_api" {
   description = "The T2X API Cloud Run service Docker image."
   type        = string
+  nullable    = true
+  default     = null
 }
 
 variable "docker_image_ui" {
   description = "The T2X UI Cloud Run service Docker image."
   type        = string
+  nullable    = true
+  default     = null
 }

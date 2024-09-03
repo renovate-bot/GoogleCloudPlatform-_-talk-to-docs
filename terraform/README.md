@@ -10,7 +10,6 @@ Terraform modules to stage and deploy the application components. The `bootstrap
 - [Prerequisites](#prerequisites)
 - [Bootstrap](#bootstrap)
     - [Execute the bootstrap script](#execute-the-bootstrap-script)
-    - [OPTIONAL Execute Terraform to apply changes to the `bootstrap` module](#optional-execute-terraform-to-apply-changes-to-the-bootstrap-module)
 - [Automate Deployments with Cloud Build](#automate-deployments-with-cloud-build)
     - [Configure `gen_ai/llm.yaml`](#1-configure-gen_aillmyaml)
     - [Configure optional input variable values in `terraform/main/vars.auto.tfvars`](#2-optional-configure-optional-input-variable-values-in-terraformmainvarsautotfvars)
@@ -31,7 +30,8 @@ Terraform modules to stage and deploy the application components. The `bootstrap
 - [Rollbacks](#rollbacks)
     - [Option 1: Use the Cloud Console to switch Cloud Run service traffic to a different revision](#option-1-use-the-cloud-console-to-switch-cloud-run-service-traffic-to-a-different-revision)
     - [Option 2: Rollback to a different Docker image using Terraform](#option-2-rollback-to-a-different-docker-image-using-terraform)
-- [[OPTIONAL] Prepare the Discovery Engine Data Store 'manually' using HTTP](#optional-prepare-the-discovery-engine-data-store-manually-using-http)
+- [Execute Terraform to apply infrastructure-only changes to the `bootstrap` or `main` module](#execute-terraform-to-apply-infrastructure-only-changes-to-the-bootstrap-or-main-module)
+- [Prepare the Discovery Engine Data Store 'manually' using HTTP](#prepare-the-discovery-engine-data-store-manually-using-http)
     - [Create metadata](#1-create-metadata)
     - [Purge documents](#2a-optional-purge-documents)
     - [Import documents](#2b-import-documents)
@@ -221,27 +221,6 @@ The `bootstrap` Terraform module provisions resources.
 source ./terraform/scripts/bootstrap.sh # change the path if necessary
 ```
 
-## [OPTIONAL] Execute Terraform to apply changes to the `bootstrap` module.
-Applying the resources from the `bootstrap` module is a one-time setup for a new project. You can re-run it, for example, to add or enable additional APIs to support future development.
-
-1. Source the `set_variables.sh` script to configure the shell environment (provides variables including `PROJECT` and `REPO_ROOT`).
-```sh
-source ./terraform/scripts/set_variables.sh # change the path if necessary
-```
-
-2. Initialize the Terraform `bootstrap` module using a [partial backend configuration](https://developer.hashicorp.com/terraform/language/settings/backends/configuration#partial-configuration).
-    - See the [Terraform Backends](#terraform-backends) section for more information.
-    - You might need to [reconfigure the backend](#reconfiguring-a-backend) if you've already initialized the module.
-```sh
-cd $REPO_ROOT/terraform/bootstrap
-tf init -backend-config="bucket=terraform-state-${PROJECT}" -backend-config="impersonate_service_account=terraform-service-account@${PROJECT}.iam.gserviceaccount.com"
-```
-
-3. Apply the Terraform configuration to provision the resources.
-```sh
-tf apply
-```
-
 
 &nbsp;
 # Automate Deployments with Cloud Build
@@ -291,13 +270,16 @@ cd $REPO_ROOT
 gcloud builds submit . --config=cloudbuild.yaml --project=$PROJECT --region=$REGION --substitutions="_RUN_TYPE=apply" --impersonate-service-account=terraform-service-account@${PROJECT}.iam.gserviceaccount.com
 ```
 
-- Submit a new build using the same command after any changes to the application source to automatically build and deploy the updated Docker images to Cloud Run.
 - Review the build logs in the [Cloud Build History](https://cloud.google.com/build/docs/view-build-results) to verify the build and deployment status.
 
 ### Building the Docker images and applying the Terraform configuration will take some time.
 - Docker builds & pushes take ~5 minutes and must complete before Cloud Build uses Terraform to provisions resources.
 - First time Terraform provisioning of all resources takes ~7-10 minutes (Memorystore Redis will take ~5+ minutes individually).
 - Subsequent Terraform runs deploying only updated Cloud Run services take ~1.5 minutes (after the Docker images are built and pushed).
+
+### APPLICATION UPDATES
+- [OPTIONAL] Repeat step 4 if you restarted your shell session or made changes to the environment variables.
+- After making changes to the application code, repeat step 5 to build and push updated Docker images and apply the Terraform configuration to deploy to Cloud Run.
 
 
 &nbsp;
@@ -527,7 +509,7 @@ workflowRevisionId: 000001-c99
     - Use a `.tfvars` file, the `-var` command line argument, or the `TF_VAR_` [environment variable](https://developer.hashicorp.com/terraform/language/values/variables#environment-variables).
 - Apply the Terraform configuration to update the Cloud Run service to the rollback target.
 
-### Examples
+### Example: select an image by digest or tag from Artifact Registry.
 - Set the project ID and service account environment variables.
 ```sh
 source ./terraform/scripts/set_variables.sh
@@ -538,10 +520,9 @@ source ./terraform/scripts/set_variables.sh
 tf init -backend-config="bucket=terraform-state-${PROJECT}" -backend-config="impersonate_service_account=terraform-service-account@${PROJECT}.iam.gserviceaccount.com"
 ```
 
-#### Example: select an image by digest or tag from Artifact Registry.
 - Set the Terraform input environment variables to the target image names.
 ```sh
-export TF_VAR_docker_image="us-central1-docker.pkg.dev/argo-genai-sa/talk-to-docs/t2x-api@sha256:4f2092b926b7e9dc30813e819bb86cfa7d664eede575539460b4a68bbd4981e1"
+export TF_VAR_docker_image_api="us-central1-docker.pkg.dev/argo-genai-sa/talk-to-docs/t2x-api@sha256:4f2092b926b7e9dc30813e819bb86cfa7d664eede575539460b4a68bbd4981e1"
 export TF_VAR_docker_image_ui="us-central1-docker.pkg.dev/argo-genai-sa/talk-to-docs/t2x-ui:latest"
 ```
 
@@ -550,20 +531,34 @@ export TF_VAR_docker_image_ui="us-central1-docker.pkg.dev/argo-genai-sa/talk-to-
 tf apply
 ```
 
-#### Example: get the deployed image names from terraform output to apply only infrastructure changes.
-- Set the Terraform input environment variables to the target image names from the Terraform output.
+
+&nbsp;
+# Execute Terraform to apply infrastructure-only changes to the `bootstrap` or `main` module.
+([return to top](#talk-to-docs-application-deployment-with-terraform))
+
+Applying the resources from the `bootstrap` module is a one-time setup for a new project. You can re-run it, for example, to add or enable additional APIs to support future development. You can apply infrastructure-only changes to the `main` module to update cloud resources without rebuilding the Docker images (and without using Cloud Build). If you don't provide docker image names as input variables, the `main` retrieves the last-deployed Docker images from the module state and reuses them in the Cloud Run services.
+
+1. Source the `set_variables.sh` script to configure the shell environment (provides variables including `PROJECT` and `REPO_ROOT`). Refer to the [Prerequisites](#prerequisites) section for details on configuring the `gcloud` CLI.
 ```sh
-export TF_VAR_docker_image=$(tf output -raw docker_image) && export TF_VAR_docker_image_ui=$(tf output -raw docker_image_ui)
+source ./terraform/scripts/set_variables.sh # change the path if necessary
 ```
 
-- Apply the Terraform configuration.
+2. Initialize the Terraform `main` or `bootstrap` module using a [partial backend configuration](https://developer.hashicorp.com/terraform/language/settings/backends/configuration#partial-configuration).
+    - See the [Terraform Backends](#terraform-backends) section for more information.
+    - You might need to [reconfigure the backend](#reconfiguring-a-backend) if you've already initialized the module.
+```sh
+cd $REPO_ROOT/terraform/main # or cd $REPO_ROOT/terraform/bootstrap
+tf init -backend-config="bucket=terraform-state-${PROJECT}" -backend-config="impersonate_service_account=terraform-service-account@${PROJECT}.iam.gserviceaccount.com"
+```
+
+3. Apply the Terraform configuration to provision the cloud resources.
 ```sh
 tf apply
 ```
 
 
 &nbsp;
-# [OPTIONAL] Prepare the Discovery Engine Data Store 'manually' using HTTP.
+# Prepare the Discovery Engine Data Store 'manually' using HTTP.
 ([return to top](#talk-to-docs-application-deployment-with-terraform))
 
 ## 1. Create metadata

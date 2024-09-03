@@ -1,6 +1,18 @@
+data "terraform_remote_state" "main" {
+  backend = "gcs"
+  config = {
+    bucket                      = "terraform-state-${var.project_id}"
+    impersonate_service_account = var.terraform_service_account
+    prefix                      = "main"
+  }
+  workspace = terraform.workspace
+}
+
 locals {
   config           = yamldecode(file("../../gen_ai/llm.yaml"))
   global_lb_domain = coalesce(var.global_lb_domain, try(module.loadbalancer.global_lb_domain, null))
+  docker_image_api = coalesce(var.docker_image_api, try(data.terraform_remote_state.main.outputs.docker_image_api, null))
+  docker_image_ui  = coalesce(var.docker_image_ui, try(data.terraform_remote_state.main.outputs.docker_image_ui, null))
 }
 
 module "vpc" {
@@ -63,7 +75,7 @@ module "cloud_run_api" {
   region           = var.region
   global_lb_domain = local.global_lb_domain
   service_account  = module.iam.t2x_service_account_email
-  docker_image     = var.docker_image_api
+  docker_image     = local.docker_image_api
 }
 
 module "cloud_run_ui" {
@@ -75,7 +87,7 @@ module "cloud_run_ui" {
   region           = var.region
   global_lb_domain = local.global_lb_domain
   service_account  = module.iam.t2x_service_account_email
-  docker_image     = var.docker_image_ui
+  docker_image     = local.docker_image_ui
 }
 
 module "discovery_engine" {
