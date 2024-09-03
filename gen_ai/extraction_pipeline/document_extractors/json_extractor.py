@@ -572,7 +572,9 @@ class CustomJsonChunkerThree(CustomJsonChunkerTwo):
             text = f"{section_name}\n"
             if section_name:
                 if item.get("Benefit"):
-                    text = extract_from_list(item["Benefit"])
+                    text += extract_from_list(item["Benefit"])
+                if item.get("BenefitCSR"):
+                    text += extract_from_list(item["BenefitCSR"])
 
             if (benefit_id, section_name) not in output_data:
                 output_data[(benefit_id, section_name)] = text
@@ -682,6 +684,7 @@ class JsonExtractor(BaseExtractor):
             filepath = self.create_filepath(metadata, section_name, output_dir)
             if not bool(re.search(r"[a-zA-Z0-9]", context)):
                 continue
+            context = re.sub(r'(\s)\1+', r'\1', context)
             with open(filepath + ".txt", "w", encoding="utf-8") as f:
                 f.write(context)
             temp_metadata = metadata.copy()
