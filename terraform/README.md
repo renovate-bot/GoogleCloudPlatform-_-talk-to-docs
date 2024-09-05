@@ -645,7 +645,6 @@ Assign the [minimum required permissions](https://cloud.google.com/iam/docs/usin
 - `roles/storage.objectUser`
 
 Assign specific Admin roles for the Terraform provisioning service account:
-- AI Platform Admin (`roles/ml.admin`)
 - Artifact Registry Administrator (`roles/artifactregistry.admin`)
 - BigQuery Admin (`roles/bigquery.admin`)
 - Cloud Build Editor (`roles/cloudbuild.builds.editor`)
@@ -660,6 +659,7 @@ Assign specific Admin roles for the Terraform provisioning service account:
 - Service Account User (`roles/iam.serviceAccountUser`) - required to [attach service accounts to resources](https://cloud.google.com/iam/docs/attach-service-accounts)
 - Service Usage Admin (`roles/serviceusage.serviceUsageAdmin`)
 - Storage Admin (`roles/storage.admin`)
+- Vertex AI Administrator (`roles/aiplatform.admin`)
 - Workflows Admin (`roles/workflows.admin`)
 
 ## **[Service account impersonation](https://cloud.google.com/iam/docs/service-account-impersonation)**

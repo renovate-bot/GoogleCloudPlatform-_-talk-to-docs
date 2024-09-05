@@ -38,7 +38,7 @@ echo ""
 echo "Granting the required IAM roles to the service account..."
 echo ""
 roles=(
-  "roles/ml.admin"
+  "roles/aiplatform.admin"
   "roles/artifactregistry.admin"
   "roles/bigquery.admin"
   "roles/cloudbuild.builds.editor"
