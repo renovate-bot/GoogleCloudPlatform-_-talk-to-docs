@@ -269,6 +269,8 @@ class CustomJsonMetadataCreatorThree(DefaultJsonMetadataCreator):
         effective_date = self.data["BenefitPlan"].get("BenefitPlanEffectiveDate")
         if isinstance(effective_date, int):
             effective_date = datetime.datetime.fromtimestamp(effective_date / 1e3).strftime("%Y-%m-%d")
+        else:
+            effective_date = datetime.datetime.strptime(effective_date, "%m/%d/%Y").strftime("%Y-%m-%d")
 
         plan_name = self.data["BenefitPlan"].get("BenefitPlanName")
 
