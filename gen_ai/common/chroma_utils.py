@@ -12,6 +12,7 @@ of application-level data structures with database-level querying capabilities.
 """
 
 from typing import Any
+from datetime import datetime
 
 
 def convert_to_chroma_format(metadata: dict[str, str]) -> dict[str, dict[str, str]]:
@@ -49,6 +50,12 @@ def convert_to_vais_format(metadata: dict[str, str]) -> str:
                 filters.append(f"{key} = {value}")
             elif isinstance(value, bool):
                 filters.append(f'{key} = "{str(value).lower()}"')
+            elif isinstance(value, datetime):
+                if len(key.split()) == 1:
+                    filters.append(f'{key} == "{value.strftime("%Y-%m-%d")}"')
+                elif len(key.split()) == 2:
+                    dt_key, operator = key.split()
+                    filters.append(f'{dt_key} {operator} "{value.strftime("%Y-%m-%d")}"')
             else:
                 filters.append(f'{key}: ANY("{value}")')
 
