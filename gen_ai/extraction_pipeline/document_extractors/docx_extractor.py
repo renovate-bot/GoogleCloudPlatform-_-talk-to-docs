@@ -1,4 +1,7 @@
-"""Provides the DocxExtractor class for extracting textual data from Docx (.docx) files and organizing the extracted data into separate files for structured document processing."""
+"""
+Provides the DocxExtractor class for extracting textual data from Docx (.docx) files and organizing 
+the extracted data into separate files for structured document processing.
+"""
 
 import datetime
 import json
@@ -181,7 +184,9 @@ class DocxExtractor(BaseExtractor):
         return True
 
     def process(self, output_dir: str) -> bool:
-        """Main function that controls the processing of a .docx document, including extraction, metadata creation, chunking, and file saving.
+        """
+        Main function that controls the processing of a .docx document, including extraction,
+        metadata creation, chunking, and file saving.
 
         This function coordinates the key steps for processing a .docx document.
         It handles document extraction, metadata generation, applies  document
@@ -211,7 +216,7 @@ class DocxExtractor(BaseExtractor):
         document_chunks = document_chunker.chunk_the_document()
         additional_kc_chunks = (
             CustomKcDocxChunker(self.document, self.raw_text).chunk_the_document()
-            if self.docx_chunking == "combo"
+            if self.docx_chunking == "custom"
             else None
         )
         if additional_kc_chunks:
@@ -356,9 +361,9 @@ class CustomKcDocxMetadataCreator(DefaultDocxMetadataCreator):
         """
         plan_name = ""
         for table in self.document.tables[:1]:
-            for cell in table._cells:
+            for cell in table._cells: # pylint: disable=W0212
                 for paragraph in cell.paragraphs:
-                    if len(table._cells) == len(cell.paragraphs) == 1:
+                    if len(table._cells) == len(cell.paragraphs) == 1: # pylint: disable=W0212
                         plan_name = " ".join(paragraph.text.split("\n"))
         if plan_name:
             return plan_name.lower()
@@ -381,6 +386,23 @@ class CustomKcDocxMetadataCreator(DefaultDocxMetadataCreator):
 
         return title
 
+    def _extract_doc_identifier(self) -> str | None:
+        """Extracts the doc_identifier from the filename of the document.
+
+        Searches for a pattern like "KM...".
+
+        Returns:
+            str: The formatted doc_identifier if found.
+            None: If the doc_identifier pattern is not found in the filename.
+        """
+        match = re.search(r"km\d+", self.filename.lower())
+
+        if match:
+            doc_identifier = match.group().strip()
+            return doc_identifier
+        else:
+            return None
+
     def create_metadata(self) -> dict[str, str]:
         """Method to be implemented by subclasses.
 
@@ -394,6 +416,7 @@ class CustomKcDocxMetadataCreator(DefaultDocxMetadataCreator):
         effective_date = self._extract_effective_date()
         title = self._extract_title()
         plan_name = self._extract_planname()
+        doc_identifier = self._extract_doc_identifier()
 
         filename = f"{policy_number}-{title}"
         filename = re.sub(r"[^\w.-]", "_", filename)
@@ -405,12 +428,12 @@ class CustomKcDocxMetadataCreator(DefaultDocxMetadataCreator):
             "set_number": "",
             "effective_date": effective_date or "",
             "cancellation_date": "",
-            "original_filepath": "",
+            "original_filepath": self.filename,
             "section_name": "",
             "plan_name": plan_name or "",
             "policy_title": title or "",
             "url": "",
-            "doc_identifier": "",
+            "doc_identifier": doc_identifier or "",
             "category_name": "",
             "benefit_id": "",
             "filename": filename or "",
@@ -460,7 +483,9 @@ class DefaultDocxChunker:
     def get_next_section_index(
         self, sections: list[tuple[str, str]], i: int = 0
     ) -> int:
-        """Finds the index of the next section within the sections list, considering sections at or below the `chunk_level`.
+        """
+        Finds the index of the next section within the sections list, considering sections at 
+        or below the `chunk_level`.
 
         Args:
             sections (list[tuple[str, str]]): A list of (heading_level,
@@ -521,7 +546,9 @@ class DefaultDocxChunker:
 
 
 class CustomKcDocxChunker(DefaultDocxChunker):
-    """Document chunker class customly created for Custom-KC use case, that provides the structure for extracting sections and chunking .docx documents.
+    """
+    Document chunker class customly created for Custom-KC use case, that provides the structure
+    for extracting sections and chunking .docx documents.
 
     Attributes:
         document (docx.Document): The loaded Document object.
@@ -546,7 +573,7 @@ class CustomKcDocxChunker(DefaultDocxChunker):
         hdngs = set()
         hldngs_list = []  # use list for order
         for table in self.document.tables:
-            for cell in table._cells:
+            for cell in table._cells: # pylint: disable=W0212
                 for paragraph in cell.paragraphs:
                     if style_name in paragraph.style.name:
                         if paragraph.text not in hdngs:
