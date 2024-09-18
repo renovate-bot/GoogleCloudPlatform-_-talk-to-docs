@@ -2,12 +2,12 @@
 # to converse with a user.
 # Project and User specific configuration
 bq_project_id: null # leave null to use ADC and write BQ logs to the deployment project - change to customize BQ location to another project
-dataset_name: medicare_demo #dataset_name # change for new project
-gcs_source_bucket: gs://medical_demo_data_recursive/extractions20240801 #gs://bucket location # change for new project
-terraform_instance_name: talk-to-docs-instance-demo
-terraform_redis_name: talk-to-docs-redis-instance-demo
+dataset_name: dataset_name # change for new project
+gcs_source_bucket: gs://bucket location # change for new project
+terraform_instance_name: talk-to-docs-instance
+terraform_redis_name: talk-to-docs-redis-instance
 memory_store_ip: redis.t2xservice.internal # leave as is to use the default redis instance created by Terraform - change to use a different redis instance private IP
-customer_name: medical #Customer # change for new project (gradio)
+customer_name: Customer # change for new project (gradio)
 customer_logo: cymbal_health.png #https://www.gstatic.com/pantheon/images/welcome/supercloud.svg # change for new project
 processed_files_dir: /mnt/resources/{dataset_name}/main_folder
 vector_store_path: gen_ai/vector_store
@@ -22,19 +22,19 @@ embeddings_model_name: textembedding-gecko@003
 vector_name: vais
 document_retriever: semantic #custom is for custom use case
 vais_staging_bucket: null # should be set if want to use existing bucket
-vais_data_store: t2x-demo # replace with data store ID to be created in Terraform and used by T2X
-vais_engine_id: t2x-demo-id # replace with search engine ID to be created in Terraform and used by T2X
+vais_data_store: t2x # replace with data store ID to be created in Terraform and used by T2X
+vais_engine_id: t2x-id # replace with search engine ID to be created in Terraform and used by T2X
 vais_location: us # us/global
 use_prev_and_next_pieces: 1 # integer between 0 and 3
-api_mode: stateless
+api_mode: stateful
 personalization: true
-temperature: 0.5
+temperature: 0.0
 max_output_tokens: 4000
 max_context_size: 1025000
 max_rounds: 1
-similar_questions_number: 0
+similar_questions_number: 2
 use_full_documents: true
-use_relevancy_score: false
+use_relevancy_score: true
 retriever_score_threshold: 2
 max_number_of_docs_retrieved: 3
 use_mmr: false
@@ -43,7 +43,7 @@ previous_conversations_number: 2
 previous_conversation_score_threshold: 2
 parallel_main_llm_calls: 5
 parallel_main_llm_timeout: 15
-separate_confidence_score: true
+separate_confidence_score: false
 
 is_debug: false
 print_system_metrics: true
@@ -393,15 +393,15 @@ answer_scoring_prompt: |
       Yes, Medi-Cal covers a range of hearing tests, including initial and six-month evaluations, hearing aid evaluations, pure tone audiometry, evoked response testing, tympanometry, and impedance audiometry. For hearing aid evaluations, providers must enter “hearing aid evaluation” in the Remarks field of the claim. Evoked response testing requires specific HCPCS and CPT codes depending on the type of test. For cochlear implantation, candidates must meet specific criteria, including a diagnosis of bilateral sensorineural deafness and age appropriateness. If the recipient is a child, they must be age-appropriate according to current FDA recommendations, up to age 20. For adults, they must have post-lingual deafness and a score of less than 30 percent on an open-set sentence recognition test. Medi-Cal coverage for audiological services is subject to medical necessity and eligibility requirements.
     </Answer>
     <Output>
-      <answer_helpfullness_resoning>The question asks about hearing test coverage. The answer provides the necessary details and some useful extra information related to different procedure for different age groupus, therefore the helpfullness score should be high.</answer_helpfullness_resoning>
-      <helpfullness_score>5</helpfullness_score>
+      <answer_confidence_resoning>The question asks about hearing test coverage. The answer provides the necessary details and some useful extra information related to different procedure for different age groupus, therefore the confidence score should be high.</answer_confidence_resoning>
+      <confidence_score>5</confidence_score>
       
     </Output>
   </Examples>
 
   <Instructions>
-    - Look at the question and answer and return helpfullness_score for the answer. It should be a number between 1 and 5.
-    - Use reasoning and step-by-step thinking, provide a answer_helpfullness_resoning to justify your response.
+    - Look at the question and answer and return confidence_score for the answer. It should be a number between 1 and 5.
+    - Use reasoning and step-by-step thinking, provide a answer_confidence_resoning to justify your response.
     - The output MUST BE A VALID JSON object. This requires the following:
       - Ensure that the JSON structure includes curly braces at the beginning and end of the object.
       - Use double quotes for all keys and string values.
@@ -413,8 +413,8 @@ answer_scoring_prompt: |
       - Response format - all the fields need to be returned as strings. 
     - Response format - all the fields need to be returned as strings. 
         {{
-          "answer_helpfullness_resoning": <A short summary on what information is missing to make the answer to the question completely helpful>,
-          "helpfullness_score": <Number between 1 and 5 indicating how helpful is the answer>,          
+          "answer_confidence_resoning": <A short summary on what information is missing to make the answer to the question completely helpful>,
+          "confidence_score": <Number between 1 and 5 indicating how helpful is the answer>,          
         }}
   </Instructions>
 
