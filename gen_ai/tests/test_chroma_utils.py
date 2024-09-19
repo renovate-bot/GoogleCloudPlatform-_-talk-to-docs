@@ -73,29 +73,108 @@ def test_convert_to_chroma_format_small_characters():
     assert convert_to_chroma_format({"a": "1", "b": "2", "c": "3"}) == {"$and": [{"a": "1"}, {"b": "2"}, {"c": "3"}]}
 
 def test_convert_to_vais_format_empty_metadata():
+    """
+    Tests the convert_to_vais_format function with an empty metadata dictionary.
+
+    This test ensures that the function correctly handles an empty input dictionary,
+    returning an empty string as expected.
+
+    Asserts
+    -------
+    The function returns an empty string when provided with an empty dictionary.
+    """
     assert convert_to_vais_format({}) == ""
 
 def test_convert_to_vais_format_int_value():
+    """
+    Tests the convert_to_vais_format function with an integer value.
+
+    This test verifies the function's ability to correctly handle a metadata dictionary
+    containing an integer value. It ensures that the function accurately converts the 
+    integer value into the VAIS format, which represents the key-value pair as a string
+    with an equals sign (=) separating the key and value.
+
+    Asserts
+    -------
+    The function returns the expected VAIS format string for a dictionary with an integer value.
+    """
     metadata = {"policy_number": 905531}
     assert convert_to_vais_format(metadata) == "policy_number = 905531"
 
 def test_convert_to_vais_format_float_value():
+    """
+    Tests the convert_to_vais_format function with a float value.
+
+    This test verifies the function's ability to correctly handle float values in the input dictionary.
+    It uses a dictionary with a single key-value pair where the value is a float. The expected output
+    is a string representation of the key-value pair with the float value formatted appropriately.
+
+    Asserts
+    -------
+    The function returns the expected VAIS format string for a dictionary with a float value.
+    """
     metadata = {"policy_number": 3.14}
     assert convert_to_vais_format(metadata) == "policy_number = 3.14"
 
 def test_convert_to_vais_format_datetime_value():
+    """
+    Tests the convert_to_vais_format function with a datetime value.
+
+    This test verifies the function's ability to correctly handle a metadata dictionary
+    containing a datetime value. It ensures that the function accurately converts the
+    datetime object into a string representation suitable for the VAIS format, specifically
+    "YYYY-MM-DD".
+
+    Asserts
+    -------
+    The function returns the expected VAIS formatted string for a dictionary with a datetime value.
+    """
     metadata = {"effective_date": datetime(2024, 9, 19)}
     assert convert_to_vais_format(metadata) == 'effective_date == "2024-09-19"'
 
 def test_convert_to_vais_format_datetime_with_operator():
+    """
+    Tests the convert_to_vais_format function with a datetime value and an operator.
+
+    This test ensures that the function correctly handles a metadata dictionary where the value 
+    is a datetime object and the key includes an operator (e.g., ">=", "<=", "=="). It verifies that the function
+    correctly formats the datetime object as "YYYY-MM-DD" and combines it with the operator in the key.
+
+    Asserts
+    -------
+    The function returns the expected VAIS format string for a datetime value with an operator.
+    """
     metadata = {"effective_date >= ": datetime(2024, 9, 19)}
     assert convert_to_vais_format(metadata) == 'effective_date >= "2024-09-19"'
 
 def test_convert_to_vais_format_string_value():
+    """
+    Tests the convert_to_vais_format function with a string value.
+
+    This test ensures that the function correctly handles an input dictionary with a single key-value pair,
+    where the value is a string. It verifies that the function produces the correct VAIS format string, 
+    which should include the key, the 'ANY' operator, and the string value enclosed in double quotes.
+
+    Asserts
+    -------
+    The function returns the expected VAIS format string for a dictionary with a string value.
+    """
     metadata = {"section_name": "Policy Data"}
     assert convert_to_vais_format(metadata) == 'section_name: ANY("Policy Data")'
 
 def test_convert_to_vais_format_multiple_values():
+    """
+    Tests the convert_to_vais_format function with multiple values.
+
+    This test ensures that the function can handle a dictionary with multiple key-value pairs of different data types
+    (integer, float, datetime, and string), correctly converting it into a VAIS filter expression. The expected output
+    is a string with the filter expression combining all key-value pairs with the `AND` operator and appropriate
+    comparison operators for each data type (`=`, `==`, `:`).
+
+    Asserts
+    -------
+    The function returns the expected VAIS filter expression for a dictionary with multiple values.
+    """
     metadata = {
         "policy_number": 123,
         "set_number": 3.14,
@@ -106,5 +185,15 @@ def test_convert_to_vais_format_multiple_values():
     assert convert_to_vais_format(metadata) == expected_filter
 
 def test_convert_to_vais_format_none_value():
+    """
+    Tests the convert_to_vais_format function with a None value.
+
+    This test verifies the behavior of the function when encountering a key-value pair where the value is None. 
+    It ensures that the function correctly handles this case and produces the expected output, which is an empty string.
+
+    Asserts
+    -------
+    The function returns an empty string when the input dictionary has a value of None.
+    """
     metadata = {"none_field": None}
     assert convert_to_vais_format(metadata) == ""
