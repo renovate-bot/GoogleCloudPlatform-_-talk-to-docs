@@ -10,7 +10,7 @@ from typing import List, Tuple
 
 import tiktoken
 import yaml
-from langchain.chat_models import ChatOpenAI, ChatVertexAI
+from langchain.chat_models import ChatVertexAI
 from langchain.chat_models.base import BaseChatModel
 from langchain.llms import VertexAI
 from langchain.schema import Document
@@ -120,7 +120,8 @@ def get_or_create_model(model_name: str) -> BaseChatModel:
     temperature = config.get("temperature", 0.001)
     max_output_tokens = config.get("max_output_tokens", 4000)
     if "gemini" in model_name or "unicorn" in model_name:
-        llms[model_name] = VertexAI(model_name=model_name, temperature=temperature, max_output_tokens=max_output_tokens, seed=42)
+        llms[model_name] = VertexAI(model_name=model_name, temperature=temperature,
+                                     max_output_tokens=max_output_tokens, seed=42)
         return llms[model_name]
     elif "chat-bison" in model_name or "text-bison" in model_name:
         llms[model_name] = ChatVertexAI(
