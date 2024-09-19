@@ -210,7 +210,7 @@ def authenticate(username, password):
 
 
 if __name__ == "__main__":
-    load_dotenv()
+    load_dotenv(dotenv_path=".env_gradio", verbose=True)
     # disable for now, we will need to dive deeper why it stopped working with gradio
     # container = Container()
     # container.init_resources()
