@@ -8,6 +8,7 @@ import concurrent.futures
 import copy
 import os
 from collections import defaultdict
+from datetime import datetime
 
 from dependency_injector.wiring import inject
 from langchain.schema import Document
@@ -260,12 +261,23 @@ class CustomSemanticDocumentRetriever(SemanticDocumentRetriever):
         if "set_number" in metadata:
             b360_metadata = copy.deepcopy(metadata)
             b360_metadata["data_source"] = "b360"
+            if "asof_date" in b360_metadata:
+                asof_date = datetime.strptime(b360_metadata["asof_date"], "%Y-%m-%d")
+                try:
+                    end_date = asof_date.replace(year=asof_date.year - 1)
+                except ValueError:
+                    end_date = asof_date.replace(year=asof_date.year - 1, day=asof_date.day - 1)
+                b360_metadata["effective_date <="] = asof_date
+                b360_metadata["effective_date >"] = end_date
+                del b360_metadata["asof_date"]
             metadatas.append(b360_metadata)
 
         kc_metadata = copy.deepcopy(metadata)
         kc_metadata["data_source"] = "kc"
         if "set_number" in kc_metadata:
             del kc_metadata["set_number"]
+        if "asof_date" in kc_metadata:
+            del kc_metadata["asof_date"]
         metadatas.append(kc_metadata)
 
         docs = []

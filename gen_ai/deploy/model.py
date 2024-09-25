@@ -55,6 +55,7 @@ class PersonalizedData(BaseModel):
         set_number (str): A set identifier for the policy.
         policy_number (str): Unique identifier for the insurance policy.
         session_id (str): Identifier for the current session or interaction.
+        asof_date (str): The date as of the claim/request si to be made (YYYY-MM-DD).
     """
 
     member_id: str = ""
@@ -70,6 +71,7 @@ class PersonalizedData(BaseModel):
     policy_number: str = ""
     session_id: str = ""
     cob_status: str = ""
+    asof_date: str = ""
 
 
 class ItemInput(BaseModel):
