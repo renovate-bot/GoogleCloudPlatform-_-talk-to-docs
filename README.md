@@ -62,7 +62,6 @@ sudo apt install make
 sudo apt install docker.io
 sudo groupadd docker
 sudo usermod -aG docker $USER
-sudo chmod 777 /var/run/docker.sock
 ```
 
 ### Setting up environment
