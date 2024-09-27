@@ -220,14 +220,15 @@ def run_pipeline(
                 "a 59 year old female without any OI (other insurance coverage). She was just diagnosed with ESRD "
                 "and is now eligible for Medicare. Which is her primary plan?"
             )
-            acis = "001acis"
             for idx, input_query in enumerate([question]):
                 Container.original_question = question
                 Container.logger().info(msg=f"Asking question {idx} in document ")
                 Container.logger().info(msg=f"Question: {input_query}")
+                # acis = "001acis"
                 answer = run_single_prediction(
                     input_query,
                     # {"set_number": acis, "member_id": "q1e23", "session_id": session_id, "policy_number": "905531"},
+                    
                     {"member_id": "36s54h2p"},
                 )
                 Container.logger().info(msg=f"Answer: {answer}")
