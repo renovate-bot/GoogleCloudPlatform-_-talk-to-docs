@@ -1,3 +1,4 @@
+#!/bin/bash
 # Copyright 2024 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#!/bin/bash
 
 # The user completes these prerequisite commmands (Google Cloud Shell sets them up automatically):
 # gcloud auth login
@@ -41,11 +41,15 @@ export TF_VAR_terraform_service_account="terraform-service-account@${PROJECT}.ia
 # Set the REPO_ROOT environment variable.
 export REPO_ROOT=$(git rev-parse --show-toplevel)
 
+# Set the BUCKET variable for Terraform remote state storage.
+export BUCKET="terraform-state-${PROJECT}"
+
 # Display the environment variables.
 echo ""
 echo "PROJECT: $PROJECT"
 echo "REGION: $REGION"
 echo "TF_VAR_project_id: $TF_VAR_project_id"
 echo "TF_VAR_terraform_service_account: $TF_VAR_terraform_service_account"
+echo "BUCKET: $BUCKET"
 echo "REPO_ROOT: $REPO_ROOT"
 echo ""
