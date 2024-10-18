@@ -32,7 +32,7 @@ from gen_ai.extraction_pipeline.vais_update import update_the_data_store
 from google.cloud.storage import Client, transfer_manager
 import yaml
 
-CONFIG_FILEPATH = "gen_ai/extraction_pipeline/config.yaml"
+CONFIG_FILEPATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config.yaml")
 PROCESSABLE_FILETYPES = set([".pdf", ".docx", ".xml", ".json", ".html", ".att_ni_xml"])
 
 
@@ -122,6 +122,7 @@ def process_directory(
                 failure += 1
 
     print(f"Successfully processed {success} out of {success+failure} files.")
+    print(f"Output directory: {output_dir}")
     print(f"Total Directory Processing Time: {default_timer()-start_time}")
 
     if success:
